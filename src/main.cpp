@@ -8,7 +8,18 @@
 #include <chrono>
 #include <iostream>
 
+
+
 #include <fcntl.h>
+
+
+#include <stdint.h>
+
+static inline uint64_t __attribute__((always_inline)) rdtsc(void) {
+  uint32_t lo, hi;
+  asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
+  return lo | ((uint64_t)(hi) << 32);
+}
 
 using namespace mobo;
 
@@ -18,27 +29,28 @@ int run_vm(std::string path) {
   // int i = 0;
 
   try {
-
     // create a vmm
     kvm vmm(kvmfd, 1);
-    // give it some ram (256 mb)
-    vmm.init_ram(1024 * 1024l * 1024l);
 
-    // load the kernel elf
-    vmm.load_elf(path);
 
-    // auto start = std::chrono::high_resolution_clock::now();
+      // give it some ram
+      vmm.init_ram(16 * 1024l * 1024l);
+    for (int i = 0; i < 1000; i++) {
+      auto start = rdtsc();
 
-    // run the vm
-    vmm.run();
+      // load the kernel elf
+      vmm.load_elf(path);
 
-    /*
-    auto dur = std::chrono::duration_cast<std::chrono::microseconds>(
-        std::chrono::high_resolution_clock::now() - start);
-    printf("%d,%ld\n", i++, dur.count());
-    */
+      // run the vm
+      vmm.run();
 
-    vmm.reset();
+      // record the time it took
+      auto dur = rdtsc() - start;
+      printf("%d,%ld\n", i, dur);
+
+      // reset the VM
+      vmm.reset();
+    }
   } catch (std::exception &ex) {
     fprintf(stderr, "ex: %s\n", ex.what());
     return -1;
@@ -47,6 +59,13 @@ int run_vm(std::string path) {
   return 0;
 }
 
+int main(int argc, char **argv) {
+  if (argc == 1) return -1;
+
+  run_vm(argv[1]);
+}
+/*
 // haskell FFI function
 extern "C" int mobo_run_vm(char *binary) { return run_vm(binary); }
 
+*/

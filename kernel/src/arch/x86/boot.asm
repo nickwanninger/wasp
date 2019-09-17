@@ -35,7 +35,14 @@ section .boot
 [bits 32]
 start:
 _start:
+
+
+	hlt
+	jmp _start
+
 	cli ; disable interrupts
+
+	;; hypertable information is in esi, edi
 
 	mov eax, gdtr32
 	lgdt [eax] ; load GDT register with start address of Global Descriptor Table

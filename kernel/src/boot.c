@@ -8,7 +8,6 @@
 #include <printk.h>
 #include <serial.h>
 #include <types.h>
-#include <posix.h>
 
 extern int kernel_end;
 
@@ -29,20 +28,36 @@ static u64 strlen(char *str) {
 // in src/arch/x86/sse.asm
 extern void enable_sse();
 
-int kmain(void) {
+
+
+
+
+
+int kmain(u64 hypermagic, u64 *hypertable) {
   serial_install();
   init_idt();
 
-  // at this point, we are still mapped with the 2mb large pages.
-  // init_mem will replace this with a more fine-grained 4k page system by
-  // mapping kernel memory 1:1
-  init_mem();
-
-  // now that we have interupts working, enable sse! (fpu)
   enable_sse();
 
-  // finally, enable interrupts
-  sti();
+  printk("hypermagic=%p\n", (void*)hypermagic);
+  printk("hypertable=%p\n", (void*)hypertable);
+
+
+  u64 *table = hypertable;
+
+  printk("%p\n", table[0]);
+  printk("%p\n", table[1]);
+
+  int regionc = table[1];
+
+
+  struct region {
+    u64 addr, size;
+  } *regions = (void*)(table + 2);
+
+  for (int i = 0; i < regionc; i++) {
+    printk("%d: %p %zu\n", i, regions[i].addr, regions[i].size);
+  }
 
   printk("hello, from the kernel\n");
 

@@ -161,96 +161,40 @@ void kvm::load_elf(std::string file) {
     if (psec->get_name() == ".comment") continue;
 
     if (type == SHT_PROGBITS) {
+      printf("%p\n", (void*)psec->get_address());
       auto size = psec->get_size();
       if (size == 0) continue;
       const char *data = psec->get_data();
-      char *dst = memory + psec->get_address();
+      char *dst = memory + (psec->get_address() & 0xFFFFFFFF);
       memcpy(dst, data, size);
     }
   }
 
-  bool found_multiboot = false;
-  struct multiboot_header mbhdr;
-  // map the file into memory and attempt to parse a multiboot2_hdr from it
+  // arbitrarially on the 5th page
+  u64 hypertable = 0x5000;
+
   {
-    int fd = open(file.c_str(), O_RDONLY);
-
-    // die if the file is not found
-    if (fd == -1)
-      throw std::runtime_error("file not found when loading the elf");
-
-    struct stat sb;
-    fstat(fd, &sb);
-    auto size = sb.st_size;
-
-    char *bin = (char *)mmap(nullptr, size, PROT_READ, MAP_SHARED, fd, 0);
-    u32 search_len = std::min((size_t)size, (size_t)MULTIBOOT_SEARCH);
-
-    // arbitrarially on the 5th page
-    u64 mbd = 0x5000;
-
-    // now scan the binary for the multiboot2 header
-    for (int i = 0; i < search_len; i += MULTIBOOT_HEADER_ALIGN) {
-      u32 val = *(u32 *)(bin + i);
-      if (val != MULTIBOOT2_HEADER_MAGIC) continue;
-
-      // we found a thing that looks like a multiboot 2 header,
-      // check the checksum to make sure it is a real header
-      memcpy(&mbhdr, bin + i, sizeof(mbhdr));
-
-      u32 checksum = -(mbhdr.magic + mbhdr.architecture + mbhdr.header_length);
-      if (checksum != mbhdr.checksum) continue;
-
-      found_multiboot = true;
-      break;
-    }
-
-    if (!found_multiboot)
-      throw std::runtime_error("no multiboot2 header found!");
-
-    if (mbhdr.architecture != 0)
-      throw std::runtime_error("only i386 multiboot arch is supported\n");
-
-    // setup the memory information at the mbd
     {
       // create a memory writer to the part of memory that represents the mbd
-      memwriter hdr(memory + mbd);
+      memwriter hdr(memory + hypertable);
 
-      hdr.write<u32>(0);
-      hdr.write<u32>(0);
-
-      struct multiboot_tag_mmap tag;
-      tag.type = MULTIBOOT_TAG_TYPE_MMAP;
-      tag.entry_size = sizeof(struct multiboot_mmap_entry);
-
-      std::vector<struct multiboot_mmap_entry> entries;
+      hdr.write<u64>(1); // entry is a memory map (type 0)
+      hdr.write<u64>(this->ram.size()); // how many memory regions are there
 
       for (auto bank : this->ram) {
-        struct multiboot_mmap_entry entry;
-        entry.addr = bank.guest_phys_addr;
-        entry.len = bank.size;
-        entry.type = MULTIBOOT_MEMORY_AVAILABLE;
-        entry.zero = 0;
-        entries.push_back(entry);
+        // write the physical address and the extent
+        hdr.write<u64>(bank.guest_phys_addr);
+        // and write how long it is
+        hdr.write<u64>(bank.size);
       }
-
-      tag.size =
-          sizeof(struct multiboot_tag_mmap) + (tag.entry_size * entries.size());
-      hdr.write(tag);
-      for (auto e : entries) {
-        hdr.write(e);
-      }
-
-      // write the size
-      *(u32 *)(memory + mbd) = hdr.get_written();
     }
 
     // setup general purpose registers
     {
       struct regs r;
       cpus[0].read_regs(r);
-      r.rax = 0x36d76289;
-      r.rbx = mbd;  // TODO: The physical address of the multiboot information
+      r.rdi = 0x4242424242424242L;
+      r.rsi = hypertable;  // TODO: The physical address of the hypertable information
       r.rip = entry;
       r.rflags &= ~(1 << 17);
       r.rflags &= ~(1 << 9);
@@ -288,10 +232,6 @@ void kvm::load_elf(std::string file) {
 
       cpus[0].write_sregs(sr);
     }
-
-    // unmap the memory and close the fd
-    munmap(bin, size);
-    close(fd);
   }
 }
 
@@ -307,6 +247,10 @@ void kvm::attach_bank(ram_bank &&bnk) {
 }
 
 void kvm::init_ram(size_t nbytes) {
+
+  if (this->mem != nullptr) {
+    munmap(this->mem, this->memsize);
+  }
   this->mem = mmap(NULL, nbytes, PROT_READ | PROT_WRITE,
                    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   this->memsize = nbytes;
@@ -433,7 +377,7 @@ void kvm::run(void) {
     return;
   }
 
-  cpus[0].dump_state(stdout, (char *)this->mem);
+  // cpus[0].dump_state(stdout, (char *)this->mem);
 }
 
 static inline void host_cpuid(struct cpuid_regs *regs) {

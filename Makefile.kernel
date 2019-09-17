@@ -1,0 +1,64 @@
+
+CC = gcc
+CXX = g++
+AS = nasm
+
+STRUCTURE := $(shell find kernel -type d)
+CODEFILES := $(addsuffix /*,$(STRUCTURE))
+CODEFILES := $(wildcard $(CODEFILES))
+
+
+CSOURCES:=$(filter %.c,$(CODEFILES))
+CPPSOURCES:=$(filter %.cpp,$(CODEFILES))
+
+COBJECTS:=$(CSOURCES:%.c=%.c.o)
+COBJECTS+=$(CPPSOURCES:%.cpp=%.cpp.o)
+
+# ASOURCES:=$(wildcard kernel/src/*.asm)
+ASOURCES:=$(filter %.asm,$(CODEFILES))
+AOBJECTS:=$(ASOURCES:%.asm=%.ao)
+
+KERNEL=build/kernel.elf
+
+AFLAGS=-f elf64 -w-zext-reloc
+
+CINCLUDES=-Ikernel/include/
+
+
+
+COMMON_FLAGS := $(CINCLUDES) -fno-omit-frame-pointer \
+				 -Wno-sign-compare\
+			   -ffreestanding \
+			   -fno-stack-protector \
+			   -fno-strict-aliasing \
+         -fno-strict-overflow \
+			   -mno-red-zone \
+			   -mcmodel=large -O3 -fno-tree-vectorize
+
+CFLAGS:= $(COMMON_FLAGS) -Wall -fno-common -Wstrict-overflow=5
+
+CPPFLAGS:= -std=c++17 -fno-rtti -fno-exceptions -fno-omit-frame-pointer
+
+DFLAGS=-g -DDEBUG -O0
+
+
+
+kern: build $(KERNEL)
+
+
+%.c.o: %.c
+	@echo " CC " $<
+	@$(CC) $(CFLAGS) -o $@ -c $<
+
+%.cpp.o: %.cpp
+	@echo " CX " $<
+	@$(CXX) $(CPPFLAGS) $(CFLAGS) -o $@ -c $<
+
+
+%.ao: %.asm
+	@echo " AS " $<
+	@$(AS) $(AFLAGS) -o $@ $<
+
+$(KERNEL): $(CODEFILES) $(ASOURCES) $(COBJECTS) $(AOBJECTS)
+	@echo " LD " $@
+	@$(LD) $(LDFLAGS) $(AOBJECTS) $(COBJECTS) -T kernel/kernel.ld -o $@
