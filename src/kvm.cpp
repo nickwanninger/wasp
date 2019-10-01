@@ -59,7 +59,7 @@ struct cpuid_regs {
 #define MAX_KVM_CPUID_ENTRIES 100
 static void filter_cpuid(struct kvm_cpuid2 *);
 
-kvm::kvm(int kvmfd, int ncpus) : kvmfd(kvmfd), ncpus(ncpus) {
+kvm::kvm(int kvmfd, std::string path, int ncpus) : kvmfd(kvmfd), ncpus(ncpus) {
   assert(ncpus == 1);  // for now...
 
   int ret;
@@ -78,6 +78,8 @@ kvm::kvm(int kvmfd, int ncpus) : kvmfd(kvmfd), ncpus(ncpus) {
   // associated with one emulated system, including memory and one or more CPUs.
   // KVM gives us a handle to this VM in the form of a file descriptor:
   vmfd = ioctl(kvmfd, KVM_CREATE_VM, (unsigned long)0);
+
+  this->path = path;
 
   init_cpus();
 }
@@ -161,7 +163,7 @@ void kvm::load_elf(std::string file) {
     if (psec->get_name() == ".comment") continue;
 
     if (type == SHT_PROGBITS) {
-      printf("%p\n", (void*)psec->get_address());
+      // printf("%p\n", (void*)psec->get_address());
       auto size = psec->get_size();
       if (size == 0) continue;
       const char *data = psec->get_data();
@@ -457,6 +459,8 @@ void kvm::reset(void) {
   for (auto &cpu : cpus) {
     cpu.reset();
   }
+
+  load_elf(this->path);
 }
 
 /* eflags masks */

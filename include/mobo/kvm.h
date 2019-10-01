@@ -77,12 +77,14 @@ class kvm {
   std::vector<ram_bank> ram;
   void attach_bank(ram_bank &&);
 
+  std::string path;
+
  public:
 
   bool halted = false;
   bool shutdown = false;
 
-  kvm(int kvmfd, int ncpus);
+  kvm(int kvmfd, std::string path, int ncpus);
   ~kvm(void);
   void load_elf(std::string);
 

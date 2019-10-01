@@ -4,16 +4,15 @@
 #include <capstone/capstone.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <sys/types.h>
-#include <chrono>
-#include <iostream>
-
-
-
-#include <fcntl.h>
-
-
 #include <stdint.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <chrono>
+#include <condition_variable>
+#include <iostream>
+#include <mutex>
+#include <queue>
+#include <thread>
 
 static inline uint64_t __attribute__((always_inline)) rdtsc(void) {
   uint32_t lo, hi;
@@ -23,38 +22,100 @@ static inline uint64_t __attribute__((always_inline)) rdtsc(void) {
 
 using namespace mobo;
 
-int run_vm(std::string path) {
-  static int kvmfd = open("/dev/kvm", O_RDWR);
+std::mutex dirty_lock;
+std::mutex clean_lock;
+std::queue<kvm *> clean;
+std::queue<kvm *> dirty;
+std::condition_variable dirty_signal;
 
-  // int i = 0;
+static void add_dirty(kvm *v) {
+  dirty_lock.lock();
+  dirty.push(v);
+  dirty_lock.unlock();
+  dirty_signal.notify_one();
+}
+
+int kvmfd = 0;
+
+static kvm *get_clean(std::string &path, size_t memsize) {
+  {
+    std::scoped_lock lck(clean_lock);
+    if (!clean.empty()) {
+      auto v = clean.front();
+      clean.pop();
+      return v;
+    }
+  }
+  // allocate a new one
+  //
+  kvm *v = new kvm(kvmfd, path, 1);
+  v->init_ram(memsize);
+  v->reset();
+  return v;
+}
+
+int run_vm(std::string path) {
+  auto t = std::thread([]() {
+    while (1) {
+      std::unique_lock<std::mutex> lk(dirty_lock);
+
+      dirty_signal.wait(lk);
+      // grab something to clean
+      //
+      kvm *v = nullptr;
+
+
+      if (!dirty.empty()) {
+        v = dirty.front();
+        dirty.pop();
+      }
+      lk.unlock();
+      if (v != nullptr) {
+        v->reset();
+        // printf("RESET!\n");
+        clean_lock.lock();
+        clean.push(v);
+        clean_lock.unlock();
+      }
+    }
+  });
+
+  if (kvmfd == 0) kvmfd = open("/dev/kvm", O_RDWR);
+
+  size_t ramsize = 16 * 1024l * 1024l;
+
+  {
+    kvm *init_vms[25];
+    for (int i = 0; i < 25; i++) {
+      init_vms[i] = get_clean(path, ramsize);
+    }
+
+
+    for (int i = 0; i < 25; i++) {
+      clean.push(init_vms[i]);
+    }
+  }
 
   try {
-    // create a vmm
-    kvm vmm(kvmfd, 1);
-
-
-      // give it some ram
-      vmm.init_ram(16 * 1024l * 1024l);
     for (int i = 0; i < 1000; i++) {
+      auto v = get_clean(path, ramsize);
       auto start = rdtsc();
 
-      // load the kernel elf
-      vmm.load_elf(path);
-
       // run the vm
-      vmm.run();
+      v->run();
 
       // record the time it took
       auto dur = rdtsc() - start;
       printf("%d,%ld\n", i, dur);
-
-      // reset the VM
-      vmm.reset();
+      add_dirty(v);
     }
+
   } catch (std::exception &ex) {
     fprintf(stderr, "ex: %s\n", ex.what());
     return -1;
   }
+
+  t.detach();
 
   return 0;
 }
