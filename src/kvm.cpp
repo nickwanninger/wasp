@@ -2,8 +2,6 @@
 #include <mobo/kvm.h>
 #include <stdio.h>
 #include <stdexcept>
-
-#include <capstone/capstone.h>
 #include <fcntl.h>
 #include <inttypes.h>  // PRIx64
 #include <linux/kvm.h>
@@ -262,31 +260,11 @@ void kvm::init_ram(size_t nbytes) {
     cpu.memsize = nbytes;
   }
 
-  // Setup the PCI hole if needed... Basically map the region of memory
-  // differently if it needs to have a hole in it. The memory is still just one
-  // region of memory, except we seperate the region using kvm's
-  // USER_MEMORY_REGION system
-  if (nbytes < KVM_32BIT_GAP_START) {
-    ram_bank bnk;
-    bnk.guest_phys_addr = 0x0000;
-    bnk.size = nbytes;
-    bnk.host_addr = this->mem;
-    attach_bank(std::move(bnk));
-  } else {
-    // we need to break up the ram to support the PCI Hole
-    ram_bank bnk1;
-    bnk1.host_addr = this->mem;
-    bnk1.guest_phys_addr = 0x0000;
-    bnk1.size = KVM_32BIT_GAP_START;
-    attach_bank(std::move(bnk1));
-
-    /* Second RAM range from 4GB to the end of RAM: */
-    ram_bank bnk2;
-    bnk2.guest_phys_addr = KVM_32BIT_MAX_MEM_SIZE;
-    bnk2.host_addr = (char *)this->mem + bnk2.guest_phys_addr;
-    bnk2.size = nbytes - bnk2.guest_phys_addr;
-    attach_bank(std::move(bnk2));
-  }
+  ram_bank bnk;
+  bnk.guest_phys_addr = 0x0000;
+  bnk.size = nbytes;
+  bnk.host_addr = this->mem;
+  attach_bank(std::move(bnk));
 }
 
 // #define RECORD_VMEXIT_LIFETIME
@@ -313,42 +291,37 @@ void kvm::run(void) {
     if (err < 0) continue;
     if (stat == KVM_EXIT_DEBUG) continue;
 
-    if (stat == KVM_EXIT_MMIO) {
-      printf("[MMIO] ");
-      void *addr = (void *)run->mmio.phys_addr;
-      if (run->mmio.is_write) {
-        printf("write %p\n", addr);
-      } else {
-        printf("read  %p\n", addr);
-      }
-      continue;
-    }
-
     if (stat == KVM_EXIT_SHUTDOWN) {
       shutdown = true;
-      printf("SHUTDOWN (probably a triple fault, lol)\n");
+      printf("SHUTDOWN (probably a triple fault)\n");
 
       printf("%d\n", run->internal.suberror);
 
       cpus[0].dump_state(stderr, (char *)this->mem);
       throw std::runtime_error("triple fault");
       return;
-      break;
     }
 
     if (stat == KVM_EXIT_INTR) {
       continue;
     }
 
-    if (stat == KVM_EXIT_HLT) {
-      halted = true;
-      break;
-    }
+    if (stat == KVM_EXIT_HLT) return;
 
     if (stat == KVM_EXIT_IO) {
-      dev_mgr.handle_io(
-          &cpus[0], run->io.port, run->io.direction == KVM_EXIT_IO_IN,
-          (void *)((char *)run + run->io.data_offset), run->io.size);
+
+      if (run->io.port == 0xFA) {
+        // exit (from the vm)
+        return;
+      }
+
+      int *data = (int *)((char *)run + run->io.data_offset);
+
+      if (run->io.port == 0x00FF) {
+        printf("%s", (char*)this->mem + *data);
+        continue;
+      }
+
       continue;
     }
 
@@ -363,10 +336,6 @@ void kvm::run(void) {
     }
 
     if (stat == KVM_EXIT_FAIL_ENTRY) {
-      /*
-      printf("failed to enter: %llu\n",
-             run->fail_entry.hardware_entry_failure_reason);
-             */
       shutdown = true;
       halted = true;
       return;
@@ -459,6 +428,17 @@ void kvm::reset(void) {
   for (auto &cpu : cpus) {
     cpu.reset();
   }
+
+  /**
+   * TODO: for security and isolation, clearing out ram
+   *       should be done.
+   */
+
+  /*
+  munmap(mem, memsize);
+  mem = mmap(NULL, memsize, PROT_READ | PROT_WRITE,
+                   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+                   */
 
   load_elf(this->path);
 }
@@ -568,30 +548,6 @@ void kvm_vcpu::dump_state(FILE *out, char *mem) {
     }
   }
 
-  fprintf(out, "\n");
-
-  if (mem != nullptr) {
-    printf("Code:\n");
-    csh handle;
-    cs_insn *insn;
-    size_t count;
-    uint8_t *code = (uint8_t *)mem + regs.rip;
-    if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK) return;
-    count = cs_disasm(handle, code, -1, regs.rip, 0, &insn);
-    if (count > 0) {
-      size_t j;
-      for (j = 0; j < count; j++) {
-        if (j > 5) break;
-        printf("0x%" PRIx64 ":\t%s %s\n", insn[j].address, insn[j].mnemonic,
-               insn[j].op_str);
-      }
-
-      cs_free(insn, count);
-    } else
-      printf("ERROR: Failed to disassemble given code!\n");
-
-    cs_close(&handle);
-  }
 #undef GET
 }
 

@@ -1,5 +1,3 @@
-
-
 extern kmain ;; c entry point
 [extern high_kern_end]
 [extern _virt_start]
@@ -119,9 +117,12 @@ align 8
 
 section .boot
 
+extern boot_stack_end
+
 ;; Kernel entrypoint, 32bit code
 global _start
 _start:
+
 
 	;; move the info that grub passes into the kenrel into
 	;; arguments that we will use when calling kmain later
@@ -132,6 +133,15 @@ _start:
   mov eax, cr4
   or eax, (CR4_PAE + CR4_PSE)
   mov cr4, eax
+
+
+
+	mov esp, boot_stack_end
+
+	call kmain
+
+
+	hlt
 
 
 	; enable long mode and the NX bit
@@ -151,6 +161,7 @@ _start:
   or eax, 0x80000000
   mov cr0, eax
 
+
   ; leave compatibility mode and enter long mode
   lgdt [gdtr]
 
@@ -162,9 +173,6 @@ _start:
   mov es, ax
   mov fs, ax
   mov gs, ax
-
-
-
 
 
 

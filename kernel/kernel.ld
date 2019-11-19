@@ -1,6 +1,3 @@
-/* Simple linker script for the JOS kernel.
-   See the GNU ld 'info' manual ("info ld") to learn the syntax. */
-
 ENTRY(_start)
 
 SECTIONS
@@ -25,20 +22,13 @@ SECTIONS
 
 
 	boot_stack_start = .;
-	. += 0xf000;  /* we start out with a 4 pages of stack */
+	. += 0x4000;  /* we start out with a 4 pages of stack */
 	boot_stack_end = .;
-
-	low_kern_end = .;
-	. = ALIGN(0x1000);
-
-	high_kern_start = .;
 
 	.text : {
 		*(.text*)
 		*(.gnu.linkonce.t*)
 	}
-
-
 
 	.rodata : {
 		*(.rodata .rodata.* .gnu.linkonce.r.*)
@@ -55,22 +45,7 @@ SECTIONS
 		*(.bss)
 	}
 
-
 	/DISCARD/ : {
 		*(.eh_frame .note.GNU-stack)
 	}
-
-	. = ALIGN(0x1000);
-	. += 0x1000;
-
-
-
-	bitmap_metadata = .;
-	. += 0x1000;
-	bitmap_start = .;
-	. += 0x1000 * 0x1000 * 8;
-	bitmap_end = .;
-
-
-	high_kern_end = .;
 }

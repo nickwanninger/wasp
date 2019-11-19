@@ -38,12 +38,13 @@ build/%.cpp.o: %.cpp
 
 $(FINAL_BIN): build $(COBJECTS)
 	@echo " CXX " $<
-	@$(CXX) -o $(FINAL_BIN) -lcapstone -pthread $(COBJECTS)
+	@$(CXX) -o $(FINAL_BIN) -pthread $(COBJECTS)
 
 build:
 	mkdir -p build
 
 clean:
+	$(MAKE) -f Makefile.kernel clean
 	rm -rf build
 
 
