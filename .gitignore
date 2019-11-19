@@ -2,7 +2,3 @@ build
 *.iso
 *.o
 *.ao
-mobo.cabal
-.ghc*
-.stack-work
-mobo
