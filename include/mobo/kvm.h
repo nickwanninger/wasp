@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <mobo/workload.h>
 #include <vector>
 
 /*
@@ -89,7 +90,7 @@ class kvm {
   void load_elf(std::string);
 
   void init_ram(size_t);
-  void run(void);
+  void run(workload &);
 
   void reset();
 };

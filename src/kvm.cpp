@@ -1,12 +1,11 @@
 #include <assert.h>
-#include <mobo/kvm.h>
-#include <stdio.h>
-#include <stdexcept>
 #include <fcntl.h>
 #include <inttypes.h>  // PRIx64
 #include <linux/kvm.h>
+#include <mobo/kvm.h>
 #include <mobo/memwriter.h>
 #include <mobo/multiboot.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -14,10 +13,12 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+
 #include <algorithm>
 #include <chrono>
 #include <elfio/elfio.hpp>
 #include <iostream>
+#include <stdexcept>
 
 using namespace mobo;
 
@@ -178,8 +179,8 @@ void kvm::load_elf(std::string file) {
       // create a memory writer to the part of memory that represents the mbd
       memwriter hdr(memory + hypertable);
 
-      hdr.write<u64>(1); // entry is a memory map (type 0)
-      hdr.write<u64>(this->ram.size()); // how many memory regions are there
+      hdr.write<u64>(1);                 // entry is a memory map (type 0)
+      hdr.write<u64>(this->ram.size());  // how many memory regions are there
 
       for (auto bank : this->ram) {
         // write the physical address and the extent
@@ -194,7 +195,8 @@ void kvm::load_elf(std::string file) {
       struct regs r;
       cpus[0].read_regs(r);
       r.rdi = 0x4242424242424242L;
-      r.rsi = hypertable;  // TODO: The physical address of the hypertable information
+      r.rsi = hypertable;  // TODO: The physical address of the hypertable
+                           // information
       r.rip = entry;
       r.rflags &= ~(1 << 17);
       r.rflags &= ~(1 << 9);
@@ -247,7 +249,6 @@ void kvm::attach_bank(ram_bank &&bnk) {
 }
 
 void kvm::init_ram(size_t nbytes) {
-
   if (this->mem != nullptr) {
     munmap(this->mem, this->memsize);
   }
@@ -269,7 +270,7 @@ void kvm::init_ram(size_t nbytes) {
 
 // #define RECORD_VMEXIT_LIFETIME
 
-void kvm::run(void) {
+void kvm::run(workload &work) {
   auto &cpufd = cpus[0].cpufd;
   auto run = cpus[0].kvm_run;
 
@@ -306,19 +307,29 @@ void kvm::run(void) {
       continue;
     }
 
-    if (stat == KVM_EXIT_HLT) return;
+    if (stat == KVM_EXIT_HLT) {
+      continue;
+    }
 
     if (stat == KVM_EXIT_IO) {
-
       if (run->io.port == 0xFA) {
-        // exit (from the vm)
+        // special exit call
         return;
       }
 
-      int *data = (int *)((char *)run + run->io.data_offset);
+      // 0xFF is the "hcall" io op
+      if (run->io.port == 0xFF) {
+        struct kvm_regs regs;
+        ioctl(cpufd, KVM_GET_REGS, &regs);
+        int res = work.handle_hcall(regs, memsize, mem);
 
-      if (run->io.port == 0x00FF) {
-        printf("%s", (char*)this->mem + *data);
+        if (res != WORKLOAD_RES_OKAY) {
+          if (res == WORKLOAD_RES_KILL) {
+            return;
+          }
+        }
+        ioctl(cpufd, KVM_SET_REGS, &regs);
+
         continue;
       }
 

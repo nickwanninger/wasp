@@ -32,8 +32,11 @@ COMMON_FLAGS := $(CINCLUDES) -fno-omit-frame-pointer \
 			   -fno-stack-protector \
 			   -fno-strict-aliasing \
          -fno-strict-overflow \
+				 -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast \
 			   -mno-red-zone \
 			   -O3 -fno-tree-vectorize
+
+
 
 CFLAGS:= $(COMMON_FLAGS) -Wall -fno-common -Wstrict-overflow=5
 
