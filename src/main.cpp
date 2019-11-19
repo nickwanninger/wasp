@@ -1,4 +1,5 @@
 // #include <mobo/jit.h>
+#include <arpa/inet.h>
 #include <capstone/capstone.h>
 #include <fcntl.h>
 #include <mobo/kvm.h>
@@ -8,6 +9,7 @@
 #include <signal.h>
 #include <stdint.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/socket.h>
 #include <sys/sysinfo.h>
 #include <sys/types.h>
@@ -164,18 +166,15 @@ int test_throughput_1(std::string path, int nrunners, int ncleaners) {
 
 */
 
-
-bool send_all(int socket, void *buffer, size_t length)
-{
-    char *ptr = (char*) buffer;
-    while (length > 0)
-    {
-        int i = send(socket, ptr, length, 0);
-        if (i < 1) return false;
-        ptr += i;
-        length -= i;
-    }
-    return true;
+bool send_all(int socket, void *buffer, size_t length) {
+  char *ptr = (char *)buffer;
+  while (length > 0) {
+    int i = write(socket, ptr, length);
+    if (i < 1) return false;
+    ptr += i;
+    length -= i;
+  }
+  return true;
 }
 
 class tcp_workload : public workload {
@@ -186,22 +185,6 @@ class tcp_workload : public workload {
 
   virtual int handle_hcall(struct kvm_regs &regs, size_t ramsize, void *ram) {
     nhcalls++;
-
-    // write
-    if (regs.rax == 1) {
-      int fd = regs.rdi;
-      off_t buf_off = regs.rsi;
-      size_t len = regs.rdx;
-
-      if (buf_off + len >= ramsize) {
-        regs.rax = -1;
-        return WORKLOAD_RES_OKAY;
-      }
-
-      char *buf = (char *)ram + buf_off;
-      regs.rax = write(fd, buf, len);
-      return 0;
-    }
 
     // send
     if (regs.rax == 2) {
@@ -218,7 +201,6 @@ class tcp_workload : public workload {
       return 0;
     }
 
-
     // recv
     if (regs.rax == 3) {
       off_t buf_off = regs.rdi;
@@ -231,7 +213,6 @@ class tcp_workload : public workload {
 
       char *buf = (char *)ram + buf_off;
       regs.rax = recv(socket, buf, len, 0);
-      printf("recv -> %d\n", (int)regs.rax);
     }
     return WORKLOAD_RES_OKAY;
   }
@@ -254,22 +235,21 @@ void runner_2(kvm *vm, int id) {
 
   while (1) {
     std::unique_lock<std::mutex> lk(socket_lock);
-    socket_signal.wait(lk);
+
+    if (sockets.empty()) socket_signal.wait(lk);
 
     if (sockets.empty()) continue;
 
+    // printf("remaining: %ld\n", sockets.size());
     int socket = sockets.front();
     sockets.pop();
 
     lk.unlock();
 
-
     tcp_workload conn(socket);
     // run the vm
     vm->run(conn);
 
-
-    printf("close\n");
     close(socket);
 
     nruns++;
@@ -281,23 +261,26 @@ void runner_2(kvm *vm, int id) {
 
 #define MAX 80
 #define PORT 8000
-#define BACKLOG 100 /* how many pending connections queue will hold */
+#define BACKLOG 1000 /* how many pending connections queue will hold */
 
 void run_server(void) {
   int server_fd;
-  struct sockaddr_in my_addr;    /* my address information */
-  struct sockaddr_in their_addr; /* connector's address information */
+  struct sockaddr_in my_addr;     /* my address information */
+  struct sockaddr_in client_addr; /* connector's address information */
 
   if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
     perror("socket");
     exit(1);
   }
 
-
+  bzero((char *)&my_addr, sizeof(my_addr));
   my_addr.sin_family = AF_INET;         /* host byte order */
   my_addr.sin_port = htons(PORT);       /* short, network byte order */
   my_addr.sin_addr.s_addr = INADDR_ANY; /* auto-fill with my IP */
-  memset(&(my_addr.sin_zero), 0, 8);    /* zero the rest of the struct */
+
+  int optval = 1;
+  setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval,
+             sizeof(int));
 
   if (bind(server_fd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)) ==
       -1) {
@@ -313,12 +296,24 @@ void run_server(void) {
   while (1) {
     socklen_t sin_size = sizeof(struct sockaddr_in);
     int fd;
-    if ((fd = accept(server_fd, (struct sockaddr *)&their_addr, &sin_size)) ==
+    if ((fd = accept(server_fd, (struct sockaddr *)&client_addr, &sin_size)) ==
         -1) {
       perror("accept");
       continue;
     }
 
+#define CONN_DEBUG
+
+#ifdef CONN_DEBUG
+
+    struct hostent *hostp;
+
+    hostp = gethostbyaddr((const char *)&client_addr.sin_addr.s_addr,
+                          sizeof(client_addr.sin_addr.s_addr), AF_INET);
+
+    char *hostaddrp = inet_ntoa(client_addr.sin_addr);
+    printf("connected (%d): %s (%s)\n", nruns.load(), hostp->h_name, hostaddrp);
+#endif
     add_sock(fd);
   }
 }
@@ -347,8 +342,20 @@ int main(int argc, char **argv) {
   if (kvmfd == 0) kvmfd = open("/dev/kvm", O_RDWR);
 
   int nprocs = get_nprocs();
-  printf("nprocs=%d\n", nprocs);
 
-  // test_throughput_1(argv[1], 1, 8);
-  test_throughput_2(argv[1], nprocs * 2);
+  int c;
+  while ((c = getopt(argc, argv, "t:")) != -1) switch (c) {
+      case 't':
+        nprocs = atoi(optarg);
+        break;
+      default:
+        printf("unexected flag '%c'\n", c);
+        exit(1);
+    }
+
+  printf("nprocs=%d\n", nprocs);
+  // lele
+  // signal(SIGPIPE, SIG_IGN);
+
+  test_throughput_2(argv[optind], nprocs);
 }

@@ -451,7 +451,10 @@ void kvm::reset(void) {
                    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
                    */
 
+  // memset(mem, 0, memsize);
   load_elf(this->path);
+
+  // printf("done cleaning\n");
 }
 
 /* eflags masks */
