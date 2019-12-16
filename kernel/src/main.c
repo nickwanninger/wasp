@@ -39,29 +39,17 @@ char buf[BUFSIZE];
 
 
 static int send_http(int status, void *data, int len) {
-  if (status == 200) {
-    send_string("HTTP/1.1 200 OK" CRNL);
-  } else {
-    return -1;
-  }
 
-
-  char len_buf[50];
-  sprintk(len_buf, "Content-Length: %lu" CRNL, len);
-  send_string(len_buf);
-
-  send_string(CRNL);  // start sending data
-
-  send(data, len);
-
+  send_string("HTTP/1.1 200 OK\r\n" \
+              "Content-Length: 45\r\n\r\n" \
+              "<html><body><b>hello</b> world</body></html>\n");
   return 0;
 }
 
 void kmain(void) {
 
   recv(buf, BUFSIZE);
-  char *payload = "<html><body><b>hello</b> world</body></html>\n";
-  send_http(200, payload, strlen(payload));
+  send_http(200, 0, 0);
 
   exit(0);
 }
