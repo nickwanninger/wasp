@@ -100,3 +100,31 @@ recv:
 
   pop ebp
 	ret
+
+
+
+
+;; store timestamps in the first page
+timestamp_address dq 0x1000
+
+
+;; the record_timestamp function just records the current value from
+;; `rdtsc` into the next 64bit location in the timestamp page
+
+global record_timestamp
+record_timestamp:
+	;; read the time stamp counter ASAP
+	rdtsc
+
+	mov ecx, [timestamp_address]
+
+	mov [ecx], eax
+	mov [ecx + 4], edx
+
+	add ecx, 8
+
+	mov [timestamp_address], ecx
+	;; zero out the next 64 bits
+	mov dword [ecx], 0
+	mov dword [ecx + 4], 0
+	ret

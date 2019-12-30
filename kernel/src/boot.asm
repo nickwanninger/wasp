@@ -19,6 +19,7 @@ align 8
 	dd CHECKSUM
 
 
+extern record_timestamp
 
 
 
@@ -123,20 +124,24 @@ extern boot_stack_end
 global _start
 _start:
 
+	mov esp, boot_stack_end
+
 
 	;; move the info that grub passes into the kenrel into
 	;; arguments that we will use when calling kmain later
 	mov edi, ebx
 	mov esi, eax
 
+	;; record a baseline or starting point for the tsc
+	call record_timestamp
+
+
   ; enable PAE and PSE
   mov eax, cr4
   or eax, (CR4_PAE + CR4_PSE)
   mov cr4, eax
 
-
-
-	mov esp, boot_stack_end
+	call record_timestamp
 
 	call kmain
 

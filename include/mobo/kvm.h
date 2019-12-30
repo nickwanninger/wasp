@@ -82,6 +82,10 @@ class kvm {
 
  public:
 
+  inline void *mem_addr(off_t o) {
+    return (void*)((char*)mem + o);
+  }
+
   bool halted = false;
   bool shutdown = false;
 

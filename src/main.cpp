@@ -163,7 +163,6 @@ int test_throughput_1(std::string path, int nrunners, int ncleaners) {
 
   return 0;
 }
-
 */
 
 bool send_all(int socket, void *buffer, size_t length) {
@@ -252,6 +251,14 @@ void runner_2(kvm *vm, int id) {
 
     close(socket);
 
+
+    auto tsc_buf = (uint64_t*)vm->mem_addr(0x1000);
+    uint64_t base = tsc_buf[0];
+    for (int i = 1; tsc_buf[i] != 0; i++) {
+      printf("%zu\n", tsc_buf[i] - base);
+    }
+
+
     nruns++;
 
     // reset the vm
@@ -311,8 +318,8 @@ void run_server(void) {
     hostp = gethostbyaddr((const char *)&client_addr.sin_addr.s_addr,
                           sizeof(client_addr.sin_addr.s_addr), AF_INET);
 
-    char *hostaddrp = inet_ntoa(client_addr.sin_addr);
-    printf("connected (%d): %s (%s)\n", nruns.load(), hostp->h_name, hostaddrp);
+    // char *hostaddrp = inet_ntoa(client_addr.sin_addr);
+    // printf("connected (%d): %s (%s)\n", nruns.load(), hostp->h_name, hostaddrp);
 #endif
     add_sock(fd);
   }
@@ -321,7 +328,7 @@ void run_server(void) {
 int test_throughput_2(std::string path, int nrunners) {
   int nprocs = get_nprocs();
 
-  size_t ramsize = 16 * 1024l * 1024l;
+  size_t ramsize = 1 * 1024l * 1024l;
   std::vector<std::thread> runners;
 
   for (int i = 0; i < nrunners; i++) {
