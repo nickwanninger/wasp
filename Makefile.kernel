@@ -73,7 +73,7 @@ clean:
 
 %.o: %.asm
 	@echo " AS " $<
-	$(AS) $(AFLAGS) -o $@ $<
+	@$(AS) $(AFLAGS) -o $@ $<
 
 $(KERNEL): $(CODEFILES) $(ASOURCES) $(CSOURCES) $(COBJECTS) $(AOBJECTS)
 	@echo " LD " $@

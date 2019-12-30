@@ -1,6 +1,11 @@
 #include <stdarg.h>
 #include <string.h>
 
+
+static inline void outb(unsigned short port, unsigned char val) {
+  __asm__ volatile("outb %0, %1" ::"a"(val), "dN"(port));
+}
+
 typedef int bool;
 #define false (0)
 #define true (1)
@@ -9,6 +14,9 @@ unsigned long long __udivmoddi4(unsigned long long a, unsigned long long b,
   *p = a % b;
   return a / b;
 }
+
+
+
 
 typedef unsigned long long uint64_t;
 
@@ -69,7 +77,8 @@ typedef unsigned long long uint64_t;
 #define IO_PORT_PUTCHAR 0xfad
 
 void putchar(char c) {
-  // TODO
+
+  outb(IO_PORT_PUTCHAR, c);
 }
 int puts(char *s) {
   // TODO:

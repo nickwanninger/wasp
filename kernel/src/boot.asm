@@ -1,27 +1,8 @@
 extern kmain ;; c entry point
-[extern high_kern_end]
-[extern _virt_start]
-[extern _virt_end]
-
-
-; Declare constants for the multiboot header.
-MBALIGN  equ  1 << 0            ; align loaded modules on page boundaries
-MEMINFO  equ  1 << 1            ; provide memory map
-FLAGS    equ  MBALIGN | MEMINFO ; this is the Multiboot 'flag' field
-MAGIC    equ  0x1BADB002        ; 'magic number' lets bootloader find the header
-CHECKSUM equ -(MAGIC + FLAGS)   ; checksum of above, to prove we are multiboot
-
-
-section .multiboot
-align 8
-	dd MAGIC
-	dd FLAGS
-	dd CHECKSUM
-
-
 extern record_timestamp
 
 
+extern boot_stack_end
 
 
 ; MSR numbers
@@ -34,6 +15,10 @@ EFER_NX equ 0x800
 ; CR4 bitmasks
 CR4_PAE equ 0x20
 CR4_PSE equ 0x10
+
+
+; CR0 bitmasks
+CR0_PAGING equ 0x80000000
 
 ; page flag bitmasks
 PG_PRESENT  equ 0x1
@@ -53,10 +38,11 @@ STACK_SIZE  equ 0x1000
 STACK_ALIGN equ 16
 
 
-; paging structures
+
+;; statically allocate page mappings
 align PAGE_SIZE
-[global boot_p4]
-boot_p4:
+[global page_directory]
+page_directory:
 	dq (boot_p3 + PG_PRESENT + PG_WRITABLE)
 	times 511 dq 0
 
@@ -64,31 +50,14 @@ boot_p3:
 	dq (boot_p2 + PG_PRESENT + PG_WRITABLE)
 	times 511 dq 0
 
-
+;; id map the first 512 2mb regions
 boot_p2:
-	dq (boot_p1_1 + PG_PRESENT + PG_WRITABLE)
-	dq (boot_p1_2 + PG_PRESENT + PG_WRITABLE)
-	times 510 dq 0
-
-
-;; ID map the first bit 512 pages of memory
-boot_p1_1:
 	;; pg starts at zero
 	%assign pg 0
 	;; repeat 512 times
   %rep 512
 		;; store the mapping to the page
-    dq (pg + PG_PRESENT + PG_WRITABLE)
-		;; pg += 4096 (small page size)
-    %assign pg pg+PAGE_SIZE
-  %endrep
-
-boot_p1_2:
-	%assign pg (512 * PAGE_SIZE)
-	;; repeat 512 times
-  %rep 512
-		;; store the mapping to the page
-    dq (pg + PG_PRESENT + PG_WRITABLE)
+    dq (pg | PG_BIG | PG_PRESENT | PG_WRITABLE)
 		;; pg += 4096 (small page size)
     %assign pg pg+PAGE_SIZE
   %endrep
@@ -111,43 +80,42 @@ gdtr:
   dw gdt_end - gdt - 1
   dq gdt
 
-
-bits 32
-align 8
-
-
 section .boot
 
-extern boot_stack_end
-
-;; Kernel entrypoint, 32bit code
+;; real mode entrypoint
+;; TODO: just boot into real mode
+[bits 16]
 global _start
 _start:
 
-	mov esp, boot_stack_end
+jmp start32
 
+[bits 32]
+
+
+
+
+start32:
+	;; load up the boot stack
+	mov esp, boot_stack_end
 
 	;; move the info that grub passes into the kenrel into
 	;; arguments that we will use when calling kmain later
 	mov edi, ebx
 	mov esi, eax
 
-	;; record a baseline or starting point for the tsc
+	;; BASELINE
 	call record_timestamp
-
 
   ; enable PAE and PSE
   mov eax, cr4
   or eax, (CR4_PAE + CR4_PSE)
   mov cr4, eax
 
+	;; PAE + PSE
 	call record_timestamp
 
 	call kmain
-
-
-	hlt
-
 
 	; enable long mode and the NX bit
   mov ecx, MSR_EFER
@@ -155,21 +123,18 @@ _start:
   or eax, (EFER_LM + EFER_NX)
   wrmsr
 
-
-  ; set cr3 to a pointer to pml4
-  mov eax, boot_p4
+	;; load the page directory into cr3
+  mov eax, page_directory
   mov cr3, eax
-
 
   ; enable paging
   mov eax, cr0
-  or eax, 0x80000000
+  or eax, CR0_PAGING
   mov cr0, eax
 
 
   ; leave compatibility mode and enter long mode
   lgdt [gdtr]
-
 
   mov ax, 0x10
   mov ss, ax

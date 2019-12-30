@@ -44,8 +44,8 @@ build:
 	mkdir -p build
 
 clean:
-	$(MAKE) -f Makefile.kernel clean
-	rm -rf build
+	$(MAKE) -s -f Makefile.kernel clean
+	@rm -rf build
 
 
 

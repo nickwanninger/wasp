@@ -318,8 +318,8 @@ void run_server(void) {
     hostp = gethostbyaddr((const char *)&client_addr.sin_addr.s_addr,
                           sizeof(client_addr.sin_addr.s_addr), AF_INET);
 
-    // char *hostaddrp = inet_ntoa(client_addr.sin_addr);
-    // printf("connected (%d): %s (%s)\n", nruns.load(), hostp->h_name, hostaddrp);
+    char *hostaddrp = inet_ntoa(client_addr.sin_addr);
+    printf("connected (%d): %s (%s)\n", nruns.load(), hostp->h_name, hostaddrp);
 #endif
     add_sock(fd);
   }
