@@ -569,6 +569,7 @@ void kvm_vcpu::reset(void) {
   ioctl(cpufd, KVM_SET_REGS, &initial_regs);
   ioctl(cpufd, KVM_SET_SREGS, &initial_sregs);
   ioctl(cpufd, KVM_SET_FPU, &initial_fpu);
+
 }
 
 void kvm_vcpu::read_regs(regs &r) {

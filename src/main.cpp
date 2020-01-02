@@ -222,6 +222,11 @@ std::queue<int> sockets;
 std::mutex socket_lock;
 std::condition_variable socket_signal;
 
+// lock around showing tsc data
+std::mutex data_lock;
+
+int run_count = 0;
+
 static void add_sock(int sock) {
   socket_lock.lock();
   sockets.push(sock);
@@ -251,13 +256,20 @@ void runner_2(kvm *vm, int id) {
 
     close(socket);
 
+    auto tsc_buf = (uint64_t *)vm->mem_addr(0x1000);
+    data_lock.lock();
 
-    auto tsc_buf = (uint64_t*)vm->mem_addr(0x1000);
-    uint64_t base = tsc_buf[0];
+    printf("%d, ", run_count++);
+
+    u64 baseline = tsc_buf[0];
     for (int i = 1; tsc_buf[i] != 0; i++) {
-      printf("%zu\n", tsc_buf[i] - base);
-    }
+      u64 tsc = tsc_buf[i];
 
+      printf("%zu", tsc - baseline);
+      if (tsc_buf[i + 1] != 0) printf(", ");
+    }
+    printf("\n");
+    data_lock.unlock();
 
     nruns++;
 
@@ -318,8 +330,9 @@ void run_server(void) {
     hostp = gethostbyaddr((const char *)&client_addr.sin_addr.s_addr,
                           sizeof(client_addr.sin_addr.s_addr), AF_INET);
 
-    char *hostaddrp = inet_ntoa(client_addr.sin_addr);
-    printf("connected (%d): %s (%s)\n", nruns.load(), hostp->h_name, hostaddrp);
+    // char *hostaddrp = inet_ntoa(client_addr.sin_addr);
+    // printf("connected (%d): %s (%s)\n", nruns.load(), hostp->h_name,
+    // hostaddrp);
 #endif
     add_sock(fd);
   }
