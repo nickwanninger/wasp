@@ -5,7 +5,6 @@
 
 #include <stdlib.h>
 #include <string>
-#include "dev_mgr.h"
 
 namespace mobo {
 
@@ -34,10 +33,6 @@ class machine {
 class driver {
  private:
   machine *m_machine = nullptr;
-
- protected:
-  // every driver has a device manager for port io
-  device_manager dev_mgr;
 
  public:
   virtual ~driver(){};

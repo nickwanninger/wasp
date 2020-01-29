@@ -3,8 +3,10 @@
 #ifndef __MOBO_KVMDRIVER_
 #define __MOBO_KVMDRIVER_
 
+#ifdef __LINUX__
 #include <linux/kvm.h>
-#include <mobo/dev_mgr.h>
+#endif
+
 #include <mobo/vcpu.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,7 +72,6 @@ class kvm {
   int vmfd;
   int ncpus;
   std::vector<kvm_vcpu> cpus;
-  device_manager dev_mgr;
   void init_cpus(void);
 
   // ram is made up of a series of banks, typically the region

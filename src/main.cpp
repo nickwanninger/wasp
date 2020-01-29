@@ -1,19 +1,28 @@
 // #include <mobo/jit.h>
+#ifdef __linux__
+
 #include <arpa/inet.h>
 #include <capstone/capstone.h>
-#include <fcntl.h>
-#include <mobo/kvm.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sched.h>
-#include <signal.h>
-#include <stdint.h>
-#include <string.h>
-#include <strings.h>
 #include <sys/socket.h>
 #include <sys/sysinfo.h>
 #include <sys/types.h>
+
+#endif
+
+#include <fcntl.h>
+#include <mobo/kvm.h>
+#include <signal.h>
+#include <stdint.h>
+#include <string.h>
+
+#ifdef _WIN32
+#include <platform/windows/unistd.h>
+#else
 #include <unistd.h>
+#endif
 
 #include <atomic>
 #include <chrono>
@@ -22,6 +31,8 @@
 #include <mutex>
 #include <queue>
 #include <thread>
+
+#include <platform/platform.h>
 
 #define RAMSIZE (16 * 1024l * 1024l)
 
@@ -67,12 +78,6 @@ static kvm *get_clean(std::string &path, size_t memsize) {
   return v;
 }
 
-void set_affinity(int cpu) {
-  cpu_set_t mask;
-  CPU_ZERO(&mask);
-  CPU_SET(cpu, &mask);
-  sched_setaffinity(0, sizeof(mask), &mask);
-}
 
 auto cleaner(void) {
   while (1) {

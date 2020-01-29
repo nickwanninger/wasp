@@ -1,4 +1,8 @@
-build
+build/
+out/
+cmake-build-debug/
+.vs/
+.idea/
 *.iso
 *.o
 *.ao

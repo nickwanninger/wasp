@@ -1,4 +1,3 @@
-#include <mobo/dev_mgr.h>
 #include <mobo/machine.h>
 #include <stdio.h>
 #include <sys/mman.h>

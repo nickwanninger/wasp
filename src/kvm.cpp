@@ -435,7 +435,6 @@ static void filter_cpuid(struct kvm_cpuid2 *kvm_cpuid) {
 }
 
 void kvm::reset(void) {
-  dev_mgr.reset();
   for (auto &cpu : cpus) {
     cpu.reset();
   }
