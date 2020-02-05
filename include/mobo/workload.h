@@ -1,7 +1,6 @@
 #pragma once
 
-#include <unistd.h>
-#include <linux/kvm.h>
+#include "vcpu.h"
 
 // results for the workloads
 //
@@ -12,5 +11,8 @@
 
 class workload {
   public:
-    virtual int handle_hcall(struct kvm_regs &regs, size_t ramsize, void *ram) = 0;
+    virtual int handle_hcall(
+            struct mobo::regs &regs,
+            size_t ramsize,
+            void *ram) = 0;
 };

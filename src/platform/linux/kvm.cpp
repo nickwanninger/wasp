@@ -2,7 +2,7 @@
 #include <fcntl.h>
 #include <inttypes.h>  // PRIx64
 #include <linux/kvm.h>
-#include <mobo/kvm.h>
+#include <platform/linux/kvm.h>
 #include <mobo/memwriter.h>
 #include <mobo/multiboot.h>
 #include <stdio.h>

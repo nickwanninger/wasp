@@ -1,19 +1,30 @@
 // #include <mobo/jit.h>
+
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <iostream>
+#include <mutex>
+#include <queue>
+#include <thread>
+
 #ifdef __linux__
 
-#include <arpa/inet.h>
 #include <capstone/capstone.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sched.h>
-#include <sys/socket.h>
 #include <sys/sysinfo.h>
 #include <sys/types.h>
 
 #endif
 
+#ifdef _WIN32
+#else
+
+#endif
+
 #include <fcntl.h>
-#include <mobo/kvm.h>
 #include <signal.h>
 #include <stdint.h>
 #include <string.h>
@@ -24,19 +35,24 @@
 #include <unistd.h>
 #endif
 
-#include <atomic>
-#include <chrono>
-#include <condition_variable>
-#include <iostream>
-#include <mutex>
-#include <queue>
-#include <thread>
+#ifdef _WIN32
+#include <platform/windows/getopt.h>
+#else
+#include <getopt.h>
+#endif
 
-#include <platform/platform.h>
+#include "platform/platform.h"
+#include "mobo/workload.h"
 
 #define RAMSIZE (16 * 1024l * 1024l)
 
-static inline uint64_t __attribute__((always_inline)) rdtsc(void) {
+#ifdef _MSC_VER
+#define FORCE_INLINE __forceinline
+#else
+#define FORCE_INLINE __attribute__((always_inline))
+#endif
+
+static inline uint64_t FORCE_INLINE rdtsc(void) {
   uint32_t lo, hi;
   asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
   return lo | ((uint64_t)(hi) << 32);
@@ -80,7 +96,7 @@ static kvm *get_clean(std::string &path, size_t memsize) {
 
 
 auto cleaner(void) {
-  while (1) {
+  while (true) {
     std::unique_lock<std::mutex> lk(dirty_lock);
 
     dirty_signal.wait(lk);
@@ -108,13 +124,13 @@ void print_throughput(float sleep_time = 0.25) {
 
 #define US_IN_S (1000 * 1000)
 
-  long sleep_us = sleep_time * US_IN_S;
+  int sleep_us = sleep_time * US_IN_S;
 
   long last_ran = nruns.load();
   long last_hcalls = nhcalls.load();
 
-  while (1) {
-    usleep(sleep_us);
+  while (true) {
+    zn_sleep_micros(sleep_us);
     secs += sleep_time;
 
     auto ran = nruns.load();       // atomic load of global variable
@@ -187,7 +203,7 @@ class tcp_workload : public workload {
 
   tcp_workload(int sock) : socket(sock) {}
 
-  virtual int handle_hcall(struct kvm_regs &regs, size_t ramsize, void *ram) {
+  virtual int handle_hcall(struct mobo::regs &regs, size_t ramsize, void *ram) {
     nhcalls++;
 
     // send
@@ -222,7 +238,7 @@ class tcp_workload : public workload {
   }
 };
 
-std::queue<int> sockets;
+std::queue<zn_socket_t> sockets;
 
 std::mutex socket_lock;
 std::condition_variable socket_signal;
@@ -239,10 +255,12 @@ static void add_sock(int sock) {
   socket_signal.notify_one();
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-noreturn"
 void runner_2(kvm *vm, int id) {
-  set_affinity(id);
+    zn_set_affinity(id);
 
-  while (1) {
+  while (true) {
     std::unique_lock<std::mutex> lk(socket_lock);
 
     if (sockets.empty()) socket_signal.wait(lk);
@@ -250,7 +268,7 @@ void runner_2(kvm *vm, int id) {
     if (sockets.empty()) continue;
 
     // printf("remaining: %ld\n", sockets.size());
-    int socket = sockets.front();
+    zn_socket_t socket = sockets.front();
     sockets.pop();
 
     lk.unlock();
@@ -259,7 +277,7 @@ void runner_2(kvm *vm, int id) {
     // run the vm
     vm->run(conn);
 
-    close(socket);
+    zn_close_socket(socket);
 
     auto tsc_buf = (uint64_t *)vm->mem_addr(0x1000);
     data_lock.lock();
@@ -282,32 +300,37 @@ void runner_2(kvm *vm, int id) {
     vm->reset();
   }
 }
+#pragma clang diagnostic pop
 
 #define MAX 80
 #define PORT 8000
 #define BACKLOG 1000 /* how many pending connections queue will hold */
 
-void run_server(void) {
-  int server_fd;
-  struct sockaddr_in my_addr;     /* my address information */
-  struct sockaddr_in client_addr; /* connector's address information */
+void run_server()
+{
+  zn_socket_t server_fd;
+  struct sockaddr_in my_addr = {};     /* my address information */
+  struct sockaddr_in client_addr = {}; /* connector's address information */
 
   if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
     perror("socket");
     exit(1);
   }
 
-  bzero((char *)&my_addr, sizeof(my_addr));
+  memset((void *)&my_addr, 0, sizeof(my_addr));
   my_addr.sin_family = AF_INET;         /* host byte order */
   my_addr.sin_port = htons(PORT);       /* short, network byte order */
   my_addr.sin_addr.s_addr = INADDR_ANY; /* auto-fill with my IP */
 
   int optval = 1;
-  setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval,
-             sizeof(int));
+  setsockopt(
+      server_fd,
+      SOL_SOCKET,
+      SO_REUSEADDR,
+      (const char *) &optval,
+      sizeof(int));
 
-  if (bind(server_fd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)) ==
-      -1) {
+  if (bind(server_fd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)) == -1) {
     perror("bind");
     exit(1);
   }
@@ -317,7 +340,7 @@ void run_server(void) {
     exit(1);
   }
 
-  while (1) {
+  while (true) {
     socklen_t sin_size = sizeof(struct sockaddr_in);
     int fd;
     if ((fd = accept(server_fd, (struct sockaddr *)&client_addr, &sin_size)) ==
@@ -343,8 +366,9 @@ void run_server(void) {
   }
 }
 
-int test_throughput_2(std::string path, int nrunners) {
-  int nprocs = get_nprocs();
+int test_throughput_2(std::string path, int nrunners)
+{
+  int nprocs = zn_get_processors_count();
 
   size_t ramsize = 1 * 1024l * 1024l;
   std::vector<std::thread> runners;
@@ -353,7 +377,7 @@ int test_throughput_2(std::string path, int nrunners) {
     runners.emplace_back(runner_2, get_clean(path, ramsize), i % nprocs);
   }
 
-  set_affinity(nrunners + 1);
+  zn_set_affinity(nrunners + 1);
 
   // start the server
   run_server();
@@ -364,9 +388,13 @@ int test_throughput_2(std::string path, int nrunners) {
 
 int main(int argc, char **argv) {
   if (argc == 1) return -1;
-  if (kvmfd == 0) kvmfd = open("/dev/kvm", O_RDWR);
 
-  int nprocs = get_nprocs();
+  // TODO: not sure where this belongs
+#if __LINUX__
+  if (kvmfd == 0) kvmfd = open("/dev/kvm", O_RDWR);
+#endif
+
+  int nprocs = zn_get_processors_count();
 
   int c;
   while ((c = getopt(argc, argv, "t:")) != -1) switch (c) {

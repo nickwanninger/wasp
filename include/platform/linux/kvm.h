@@ -3,10 +3,7 @@
 #ifndef __MOBO_KVMDRIVER_
 #define __MOBO_KVMDRIVER_
 
-#ifdef __LINUX__
 #include <linux/kvm.h>
-#endif
-
 #include <mobo/vcpu.h>
 #include <stdio.h>
 #include <stdlib.h>
