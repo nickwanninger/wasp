@@ -1,6 +1,12 @@
+#include <inttypes.h>
+
 #include <mobo/machine.h>
 #include <stdio.h>
-#include <sys/mman.h>
+//#include <sys/mman.h>
+#include <elfio/elfio.hpp>
+#include <mobo/types.h>
+#include <mobo/memwriter.h>
+#include <mobo/vcpu.h>
 
 using namespace mobo;
 
@@ -28,11 +34,110 @@ void machine::allocate_ram(size_t nbytes) {
   m_driver.attach_memory(mem_size, memory);
 }
 
-void machine::load_elf(std::string file) { return m_driver.load_elf(file); }
+
+// TODO: abstract the loading of an elf file to a general function that takes
+//       some memory and a starting vcpu
+void machine::load_elf(std::string file) {
+  char *memory = (char *)mem;  // grab a char buffer reference to the mem
+
+  ELFIO::elfio reader;
+  reader.load(file);
+  auto entry = reader.get_entry();
+
+  auto secc = reader.sections.size();
+  for (int i = 0; i < secc; i++) {
+    auto psec = reader.sections[i];
+    auto type = psec->get_type();
+    if (psec->get_name() == ".comment") continue;
+
+    if (type == SHT_PROGBITS) {
+      // printf("%p\n", (void*)psec->get_address());
+      auto size = psec->get_size();
+      if (size == 0) continue;
+      const char *data = psec->get_data();
+      char *dst = memory + (psec->get_address() & 0xFFFFFFFF);
+      memcpy(dst, data, size);
+    }
+  }
+
+  // arbitrarially on the 5th page
+  u64 hypertable = 0x5000;
+
+  {
+    {
+      // create a memory writer to the part of memory that represents the mbd
+      memwriter hdr(memory + hypertable);
+
+      hdr.write<u64>(1);                 // entry is a memory map (type 0)
+      hdr.write<u64>(this->ram.size());  // how many memory regions are there
+
+      for (auto bank : this->ram) {
+        // write the physical address and the extent
+        hdr.write<u64>(bank.guest_phys_addr);
+        // and write how long it is
+        hdr.write<u64>(bank.size);
+      }
+    }
+
+    // setup general purpose registers
+    {
+      struct regs r;
+      cpus(0)->read_regs(r);
+      r.rdi = 0x4242424242424242L;
+      r.rsi = hypertable;  // TODO: The physical address of the hypertable
+      // information
+      r.rip = entry;
+      r.rflags &= ~(1 << 17);
+      r.rflags &= ~(1 << 9);
+      cpus(0)->write_regs(r);
+    }
+
+    // setup the special registers
+    {
+      sregs sr;
+      cpus(0)->read_sregs(sr);
+
+      auto init_seg = [](mobo::segment &seg) {
+        seg.present = 1;
+        seg.base = 0;
+        seg.db = 1;
+        seg.g = 1;
+        seg.selector = 0x10;
+        seg.limit = 0xFFFFFFF;
+        seg.type = 0x3;
+      };
+
+      init_seg(sr.cs);
+      sr.cs.selector = 0x08;
+      sr.cs.type = 0x0a;
+      sr.cs.s = 1;
+      init_seg(sr.ds);
+      init_seg(sr.es);
+      init_seg(sr.fs);
+      init_seg(sr.gs);
+      init_seg(sr.ss);
+
+      // clear bit 31, set bit 0
+      sr.cr0 &= ~(1 << 31);
+      sr.cr0 |= (1 << 0);
+
+      cpus(0)->write_sregs(sr);
+    }
+  }
+}
 
 void machine::run() { return m_driver.run(); }
 
+void machine::reset() {
+  m_driver.reset();
+}
+
+uint32_t machine::num_cpus() { return m_driver.num_cpus(); }
+
+mobo::vcpu::ptr machine::cpus(uint32_t index)
+{
+  return m_driver.cpu(index);
+}
+
 // setter for a machine
 void driver::set_machine(machine *m) { m_machine = m; }
-
-

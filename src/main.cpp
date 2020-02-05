@@ -1,62 +1,22 @@
-// #include <mobo/jit.h>
+#include "compiler_defs.h"
 
 #include <atomic>
-#include <chrono>
 #include <condition_variable>
 #include <iostream>
 #include <mutex>
 #include <queue>
 #include <thread>
-
-#ifdef __linux__
-
-#include <capstone/capstone.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <sched.h>
-#include <sys/sysinfo.h>
-#include <sys/types.h>
-
-#endif
-
-#ifdef _WIN32
-#else
-
-#endif
-
 #include <fcntl.h>
-#include <signal.h>
-#include <stdint.h>
-#include <string.h>
 
-#ifdef _WIN32
-#include <platform/windows/unistd.h>
-#else
-#include <unistd.h>
-#endif
+#include <cstdint>
+#include <cstring>
 
-#ifdef _WIN32
-#include <platform/windows/getopt.h>
-#else
-#include <getopt.h>
-#endif
-
+#include "platform/getopt.h"
+#include "platform/unistd.h"
 #include "platform/platform.h"
 #include "mobo/workload.h"
 
 #define RAMSIZE (16 * 1024l * 1024l)
-
-#ifdef _MSC_VER
-#define FORCE_INLINE __forceinline
-#else
-#define FORCE_INLINE __attribute__((always_inline))
-#endif
-
-static inline uint64_t FORCE_INLINE rdtsc(void) {
-  uint32_t lo, hi;
-  asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
-  return lo | ((uint64_t)(hi) << 32);
-}
 
 using namespace mobo;
 
@@ -65,20 +25,20 @@ std::atomic<int> nhcalls = 0;
 
 std::mutex dirty_lock;
 std::mutex clean_lock;
-std::queue<kvm *> clean;
-std::queue<kvm *> dirty;
+std::queue<mobo::machine::ptr> clean;
+std::queue<mobo::machine::ptr> dirty;
 std::condition_variable dirty_signal;
 
-static void add_dirty(kvm *v) {
+mobo::context g_context;
+
+static void add_dirty(mobo::machine::ptr v) {
   dirty_lock.lock();
   dirty.push(v);
   dirty_lock.unlock();
   dirty_signal.notify_one();
 }
 
-int kvmfd = 0;
-
-static kvm *get_clean(std::string &path, size_t memsize) {
+static std::shared_ptr<mobo::machine> get_clean(std::string &path, size_t memsize) {
   {
     std::scoped_lock lck(clean_lock);
     if (!clean.empty()) {
@@ -88,7 +48,7 @@ static kvm *get_clean(std::string &path, size_t memsize) {
     }
   }
   // allocate a new one
-  kvm *v = new kvm(kvmfd, path, 1);
+  mobo::machine::ptr v = g_context.create(mobo::driver_kind_any, 1);
   v->init_ram(memsize);
   v->reset();
   return v;
@@ -102,7 +62,7 @@ auto cleaner(void) {
     dirty_signal.wait(lk);
     // grab something to clean
     //
-    kvm *v = nullptr;
+    mobo::machine::ptr v;
 
     if (!dirty.empty()) {
       v = dirty.front();
@@ -199,11 +159,11 @@ bool send_all(int socket, void *buffer, size_t length) {
 
 class tcp_workload : public workload {
  public:
-  int socket = 0;
+  zn_socket_t socket = {};
 
-  tcp_workload(int sock) : socket(sock) {}
+  tcp_workload(zn_socket_t sock) : socket(sock) {}
 
-  virtual int handle_hcall(struct mobo::regs &regs, size_t ramsize, void *ram) {
+  int handle_hcall(struct mobo::regs &regs, size_t ramsize, void *ram) override {
     nhcalls++;
 
     // send
@@ -257,7 +217,7 @@ static void add_sock(int sock) {
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
-void runner_2(kvm *vm, int id) {
+void runner_2(kvm_driver *vm, int id) {
     zn_set_affinity(id);
 
   while (true) {

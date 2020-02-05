@@ -2,4 +2,5 @@
 
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 typedef int zn_socket_t;

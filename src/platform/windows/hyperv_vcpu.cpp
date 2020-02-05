@@ -1,9 +1,12 @@
-#include <platform/windows/hyperv.h>
 #include <WinHvPlatform.h>
 #include <winnt.h>
+#include <winerror.h>
 #include <stdexcept>
 
-#define FAILED(HR) ((HR) < 0)
+#include "platform/windows/hyperv_vcpu.h"
+#include "compiler_defs.h"
+
+using namespace mobo;
 
 hyperv_vcpu::hyperv_vcpu(
     WHV_PARTITION_HANDLE partition_handle,
@@ -41,7 +44,7 @@ const WHV_REGISTER_NAME k_hyperv_mapping_regnames[] = {
     WHvX64RegisterRflags,
 };
 
-enum struct hyperv_mapping_reg_index {
+enum struct hyperv_mapping_reg_index : uint32_t {
   rax = 0, rbx, rcx, rdx,
   rsi, rdi, rsp, rbp,
   r8, r9, r10, r11, r12, r13, r14, r15,
@@ -68,11 +71,9 @@ const WHV_REGISTER_NAME k_hyperv_mapping_sregnames[] = {
 
     WHvX64RegisterEfer,
     WHvX64RegisterApicBase,
-
-
 };
 
-enum struct hyperv_mapping_sreg_index {
+enum struct hyperv_mapping_sreg_index : uint32_t {
   cs = 0, ds, es, fs, gs, ss, tr,
   gdt, idt,
   cr0, cr2, cr3, cr4, cr8,
@@ -295,21 +296,21 @@ void hyperv_vcpu::write_sregs(mobo::sregs &r)
 }
 
 void hyperv_vcpu::read_fregs(mobo::fpu_regs &regs) {
-
+  // TODO
 }
 
 void hyperv_vcpu::write_fregs(mobo::fpu_regs &regs) {
-
+  // TODO
 }
 
-void hyperv_machine::attach_memory(size_t size, void *pVoid) {
-
+void *hyperv_vcpu::translate_address(u64 gva)
+{
+  // TODO
+  return nullptr;
 }
 
-void hyperv_machine::load_elf(std::string &string) {
-
+void hyperv_vcpu::reset()
+{
+  // TODO
 }
 
-void hyperv_machine::run(void) {
-
-}

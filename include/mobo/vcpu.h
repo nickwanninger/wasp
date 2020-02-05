@@ -3,9 +3,10 @@
 #ifndef __MOBO_VCPU_
 #define __MOBO_VCPU_
 
-#include <mobo/types.h>
 #include <functional>
 #include <vector>
+#include <memory>
+#include <mobo/types.h>
 
 namespace mobo {
 
@@ -63,6 +64,8 @@ struct fpu_regs {
 // the vcpu struct is a general interface to a virtualized x86_64 CPU
 class vcpu {
  public:
+  typedef std::shared_ptr<vcpu> ptr;
+
   // GPR
   virtual void read_regs(regs &) = 0;
   virtual void write_regs(regs &) = 0;
@@ -72,13 +75,13 @@ class vcpu {
   // FPR
   virtual void read_fregs(fpu_regs &) = 0;
   virtual void write_fregs(fpu_regs &) = 0;
-  virtual void dump_state(FILE *, char * = nullptr) = 0;
+  virtual void dump_state(FILE *, char *);
 
   // translate a guest virtual address into the host address
   virtual void *translate_address(u64 gva) = 0;
 
   // used to reset vm state. CPUS must manage this on their own
-  virtual void reset(void) = 0;
+  virtual void reset() = 0;
 
   // read a string starting from gva until a nullptr
   std::string read_string(u64 gva);

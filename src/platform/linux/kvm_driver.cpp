@@ -2,22 +2,16 @@
 #include <fcntl.h>
 #include <inttypes.h>  // PRIx64
 #include <linux/kvm.h>
-#include <platform/linux/kvm.h>
-#include <mobo/memwriter.h>
+#include <platform/linux/kvm_driver.h>
 #include <mobo/multiboot.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 #include <algorithm>
-#include <chrono>
-#include <elfio/elfio.hpp>
-#include <iostream>
 #include <stdexcept>
 
 using namespace mobo;
@@ -58,7 +52,7 @@ struct cpuid_regs {
 #define MAX_KVM_CPUID_ENTRIES 100
 static void filter_cpuid(struct kvm_cpuid2 *);
 
-kvm::kvm(int kvmfd, std::string path, int ncpus) : kvmfd(kvmfd), ncpus(ncpus) {
+kvm_driver::kvm_driver(int kvmfd, int ncpus) : kvmfd(kvmfd), ncpus(ncpus) {
   assert(ncpus == 1);  // for now...
 
   int ret;
@@ -78,12 +72,10 @@ kvm::kvm(int kvmfd, std::string path, int ncpus) : kvmfd(kvmfd), ncpus(ncpus) {
   // KVM gives us a handle to this VM in the form of a file descriptor:
   vmfd = ioctl(kvmfd, KVM_CREATE_VM, (unsigned long)0);
 
-  this->path = path;
-
   init_cpus();
 }
 
-mobo::kvm::~kvm() {
+mobo::kvm_driver::~kvm_driver() {
   // need to close the vmfd, and all cpu fds
   for (auto &cpu : cpus) {
     close(cpu.cpufd);
@@ -93,7 +85,7 @@ mobo::kvm::~kvm() {
   munmap(mem, memsize);
 }
 
-void kvm::init_cpus(void) {
+void kvm_driver::init_cpus(void) {
   int kvm_run_size = ioctl(kvmfd, KVM_GET_VCPU_MMAP_SIZE, nullptr);
   // get cpuid info
   struct kvm_cpuid2 *kvm_cpuid;
@@ -146,98 +138,7 @@ void kvm::init_cpus(void) {
   free(kvm_cpuid);
 }
 
-// TODO: abstract the loading of an elf file to a general function that takes
-//       some memory and a starting vcpu
-void kvm::load_elf(std::string file) {
-  char *memory = (char *)mem;  // grab a char buffer reference to the mem
-
-  ELFIO::elfio reader;
-  reader.load(file);
-  auto entry = reader.get_entry();
-
-  auto secc = reader.sections.size();
-  for (int i = 0; i < secc; i++) {
-    auto psec = reader.sections[i];
-    auto type = psec->get_type();
-    if (psec->get_name() == ".comment") continue;
-
-    if (type == SHT_PROGBITS) {
-      // printf("%p\n", (void*)psec->get_address());
-      auto size = psec->get_size();
-      if (size == 0) continue;
-      const char *data = psec->get_data();
-      char *dst = memory + (psec->get_address() & 0xFFFFFFFF);
-      memcpy(dst, data, size);
-    }
-  }
-
-  // arbitrarially on the 5th page
-  u64 hypertable = 0x5000;
-
-  {
-    {
-      // create a memory writer to the part of memory that represents the mbd
-      memwriter hdr(memory + hypertable);
-
-      hdr.write<u64>(1);                 // entry is a memory map (type 0)
-      hdr.write<u64>(this->ram.size());  // how many memory regions are there
-
-      for (auto bank : this->ram) {
-        // write the physical address and the extent
-        hdr.write<u64>(bank.guest_phys_addr);
-        // and write how long it is
-        hdr.write<u64>(bank.size);
-      }
-    }
-
-    // setup general purpose registers
-    {
-      struct regs r;
-      cpus[0].read_regs(r);
-      r.rdi = 0x4242424242424242L;
-      r.rsi = hypertable;  // TODO: The physical address of the hypertable
-                           // information
-      r.rip = entry;
-      r.rflags &= ~(1 << 17);
-      r.rflags &= ~(1 << 9);
-      cpus[0].write_regs(r);
-    }
-
-    // setup the special registers
-    {
-      sregs sr;
-      cpus[0].read_sregs(sr);
-
-      auto init_seg = [](mobo::segment &seg) {
-        seg.present = 1;
-        seg.base = 0;
-        seg.db = 1;
-        seg.g = 1;
-        seg.selector = 0x10;
-        seg.limit = 0xFFFFFFF;
-        seg.type = 0x3;
-      };
-
-      init_seg(sr.cs);
-      sr.cs.selector = 0x08;
-      sr.cs.type = 0x0a;
-      sr.cs.s = 1;
-      init_seg(sr.ds);
-      init_seg(sr.es);
-      init_seg(sr.fs);
-      init_seg(sr.gs);
-      init_seg(sr.ss);
-
-      // clear bit 31, set bit 0
-      sr.cr0 &= ~(1 << 31);
-      sr.cr0 |= (1 << 0);
-
-      cpus[0].write_sregs(sr);
-    }
-  }
-}
-
-void kvm::attach_bank(ram_bank &&bnk) {
+void kvm_driver::attach_bank(ram_bank &&bnk) {
   struct kvm_userspace_memory_region code_region = {
       .slot = (uint32_t)ram.size(),
       .guest_phys_addr = bnk.guest_phys_addr,
@@ -248,7 +149,7 @@ void kvm::attach_bank(ram_bank &&bnk) {
   ram.push_back(std::move(bnk));
 }
 
-void kvm::init_ram(size_t nbytes) {
+void kvm_driver::init_ram(size_t nbytes) {
   if (this->mem != nullptr) {
     munmap(this->mem, this->memsize);
   }
@@ -270,7 +171,7 @@ void kvm::init_ram(size_t nbytes) {
 
 // #define RECORD_VMEXIT_LIFETIME
 
-void kvm::run(workload &work) {
+void kvm_driver::run(workload &work) {
   auto &cpufd = cpus[0].cpufd;
   auto run = cpus[0].kvm_run;
 
@@ -319,8 +220,8 @@ void kvm::run(workload &work) {
 
       // 0xFF is the "hcall" io op
       if (run->io.port == 0xFF) {
-        struct kvm_regs regs;
-        ioctl(cpufd, KVM_GET_REGS, &regs);
+        mobo::regs regs = {};
+        cpus[0].read_regs(regs);
         int res = work.handle_hcall(regs, memsize, mem);
 
         if (res != WORKLOAD_RES_OKAY) {
@@ -328,8 +229,8 @@ void kvm::run(workload &work) {
             return;
           }
         }
-        ioctl(cpufd, KVM_SET_REGS, &regs);
 
+        cpus[0].write_regs(regs);
         continue;
       }
 
@@ -434,7 +335,7 @@ static void filter_cpuid(struct kvm_cpuid2 *kvm_cpuid) {
   }
 }
 
-void kvm::reset(void) {
+void kvm_driver::reset(void) {
   for (auto &cpu : cpus) {
     cpu.reset();
   }
@@ -451,7 +352,6 @@ void kvm::reset(void) {
                    */
 
   memset(mem, 0, memsize);
-  load_elf(this->path);
 
   // printf("done cleaning\n");
 }
@@ -480,89 +380,6 @@ void kvm::reset(void) {
 #define VIP_MASK 0x00100000
 #define ID_MASK 0x00200000
 
-static void cpu_dump_seg_cache(kvm_vcpu *cpu, FILE *out, const char *name,
-                               mobo::segment const &seg) {
-  fprintf(out, "%-3s=%04x %016" PRIx64 " %08x %d %02x %02x  %02x\n", name,
-          seg.selector, (size_t)seg.base, seg.limit, seg.present, seg.db,
-          seg.dpl, seg.type);
-}
-
-void kvm_vcpu::dump_state(FILE *out, char *mem) {
-  mobo::regs regs;
-  read_regs(regs);
-
-  unsigned int eflags = regs.rflags;
-#define GET(name) \
-  *(uint64_t *)(((char *)&regs) + offsetof(struct kvm_regs, name))
-
-#define REGFMT "%016" PRIx64
-  fprintf(out,
-          "RAX=" REGFMT " RBX=" REGFMT " RCX=" REGFMT " RDX=" REGFMT
-          "\n"
-          "RSI=" REGFMT " RDI=" REGFMT " RBP=" REGFMT " RSP=" REGFMT
-          "\n"
-          "R8 =" REGFMT " R9 =" REGFMT " R10=" REGFMT " R11=" REGFMT
-          "\n"
-          "R12=" REGFMT " R13=" REGFMT " R14=" REGFMT " R15=" REGFMT
-          "\n"
-          "RIP=" REGFMT " RFL=%08x [%c%c%c%c%c%c%c]\n",
-
-          GET(rax), GET(rbx), GET(rcx), GET(rdx), GET(rsi), GET(rdi), GET(rbp),
-          GET(rsp), GET(r8), GET(r9), GET(r10), GET(r11), GET(r12), GET(r13),
-          GET(r14), GET(r15), GET(rip), eflags, eflags & DF_MASK ? 'D' : '-',
-          eflags & CC_O ? 'O' : '-', eflags & CC_S ? 'S' : '-',
-          eflags & CC_Z ? 'Z' : '-', eflags & CC_A ? 'A' : '-',
-          eflags & CC_P ? 'P' : '-', eflags & CC_C ? 'C' : '-');
-
-  mobo::sregs sregs;
-  read_sregs(sregs);
-
-  fprintf(out, "    sel  base             limit    p db dpl type\n");
-  cpu_dump_seg_cache(this, out, "ES", sregs.es);
-  cpu_dump_seg_cache(this, out, "CS", sregs.cs);
-  cpu_dump_seg_cache(this, out, "SS", sregs.ss);
-  cpu_dump_seg_cache(this, out, "DS", sregs.ds);
-  cpu_dump_seg_cache(this, out, "FS", sregs.fs);
-  cpu_dump_seg_cache(this, out, "GS", sregs.gs);
-  cpu_dump_seg_cache(this, out, "LDT", sregs.ldt);
-  cpu_dump_seg_cache(this, out, "TR", sregs.tr);
-
-  fprintf(out, "GDT=     %016" PRIx64 " %08x\n", (size_t)sregs.gdt.base,
-          (int)sregs.gdt.limit);
-  fprintf(out, "IDT=     %016" PRIx64 " %08x\n", (size_t)sregs.idt.base,
-          (int)sregs.idt.limit);
-
-  fprintf(out,
-          "CR0=%016" PRIx64 " CR2=%016" PRIx64 " CR3=%016" PRIx64 " CR4=%08x\n",
-          (size_t)sregs.cr0, (size_t)sregs.cr2, (size_t)sregs.cr3,
-          (int)sregs.cr4);
-
-  fprintf(out, "EFER=%016" PRIx64 "\n", (size_t)sregs.efer);
-
-  fpu_regs fpu;
-  read_fregs(fpu);
-
-  {
-    int written = 0;
-    for (int i = 0; i < 16; i++) {
-      fprintf(out, "XMM%-2d=", i);
-
-      for (int j = 0; j < 16; j++) {
-        fprintf(out, "%02x", fpu.xmm[i][j]);
-      }
-      written++;
-
-      if (written == 2) {
-        fprintf(out, "\n");
-        written = 0;
-      } else {
-        fprintf(out, " ");
-      }
-    }
-  }
-
-#undef GET
-}
 
 void kvm_vcpu::reset(void) {
   ioctl(cpufd, KVM_SET_REGS, &initial_regs);

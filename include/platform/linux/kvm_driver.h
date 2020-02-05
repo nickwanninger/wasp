@@ -4,12 +4,14 @@
 #define __MOBO_KVMDRIVER_
 
 #include <linux/kvm.h>
-#include <mobo/vcpu.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
-#include <mobo/workload.h>
 #include <vector>
+
+#include <mobo/workload.h>
+#include <mobo/vcpu.h>
+#include <mobo/machine.h>
 
 /*
  * The hole includes VESA framebuffer and PCI memory.
@@ -38,19 +40,19 @@ struct kvm_vcpu : public mobo::vcpu {
 
 
   // GPR
-  virtual void read_regs(regs &);
-  virtual void write_regs(regs &);
+  void read_regs(regs &) override;
+  void write_regs(regs &) override;
   // SPR
-  virtual void read_sregs(sregs &);
-  virtual void write_sregs(sregs &);
+  void read_sregs(sregs &) override;
+  void write_sregs(sregs &) override;
   // FPR
-  virtual void read_fregs(fpu_regs &);
-  virtual void write_fregs(fpu_regs &);
+  void read_fregs(fpu_regs &) override;
+  void write_fregs(fpu_regs &) override;
 
-  virtual void dump_state(FILE *, char *mem = nullptr);
+  void dump_state(FILE *, char *mem = nullptr) override;
 
-  virtual void *translate_address(u64 gva);
-  virtual void reset(void);
+  void *translate_address(u64 gva) override;
+  void reset(void) override;
 };
 
 // a memory bank represents a segment of memory in the kvm CPU
@@ -60,7 +62,7 @@ struct ram_bank {
   size_t size;
 };
 
-class kvm {
+class kvm_driver : public mobo::driver {
  private:
   void *mem;
   size_t memsize;
@@ -69,7 +71,7 @@ class kvm {
   int vmfd;
   int ncpus;
   std::vector<kvm_vcpu> cpus;
-  void init_cpus(void);
+  void init_cpus();
 
   // ram is made up of a series of banks, typically the region
   // before the PCI gap, and the region after the gap
@@ -87,14 +89,13 @@ class kvm {
   bool halted = false;
   bool shutdown = false;
 
-  kvm(int kvmfd, std::string path, int ncpus);
-  ~kvm(void);
-  void load_elf(std::string);
+  kvm_driver(int kvmfd, int ncpus);
+  ~kvm_driver() override;
 
   void init_ram(size_t);
   void run(workload &);
 
-  void reset();
+  void reset() override;
 };
 
 }  // namespace mobo

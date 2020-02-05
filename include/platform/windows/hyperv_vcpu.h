@@ -3,14 +3,7 @@
 #include <mobo/machine.h>
 #include <WinHvPlatformDefs.h>
 
-class hyperv_driver : public mobo::driver {
-
-  void attach_memory(size_t size, void *pVoid) override;
-
-  void load_elf(std::string &string) override;
-
-  void run(void) override;
-};
+namespace mobo {
 
 class hyperv_vcpu : public mobo::vcpu {
 
@@ -32,8 +25,8 @@ public:
   void read_fregs(mobo::fpu_regs &) override;
   void write_fregs(mobo::fpu_regs &) override;
 
-  void dump_state(FILE *, char *mem = nullptr) override;
-
   void *translate_address(u64 gva) override;
-  void reset(void) override;
+  void reset() override;
 };
+
+}

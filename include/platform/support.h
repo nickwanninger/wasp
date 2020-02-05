@@ -1,10 +1,10 @@
 #pragma once
 
 #ifdef _WIN32
-#include "windows/socket.h"
+#define ZN_PLATFORM_HYPERV
 
 #elif __linux__
-#include "linux/socket.h"
+#define ZN_PLATFORM_KVM
 
 #else
 #error "unsupported platform"

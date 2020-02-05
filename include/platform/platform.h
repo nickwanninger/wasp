@@ -4,8 +4,9 @@
 #define __MOBO_PLATFORM__
 
 #include <cstdint>
-#include "socket.h"
-#include "backend.h"
+#include "support.h"
+#include "./socket.h"
+#include "./backend.h"
 
 void
 zn_set_affinity(int cpu);

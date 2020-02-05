@@ -1,10 +1,13 @@
 #pragma once
 
-#ifdef _WIN32
-#include "windows/hyperv.h"
+#include "support.h"
 
-#elif __LINUX__
-#include "linux/kvm.h"
+#ifdef _WIN32
+#include "platform/windows/hyperv_vcpu.h"
+#include "platform/windows/hyperv_driver.h"
+
+#elif __linux__
+#include "platform/linux/kvm_driver.h"
 
 #else
 #error "unsupported platform"
