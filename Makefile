@@ -36,9 +36,8 @@ build/%.cpp.o: %.cpp
 	@echo " CXX " $<
 	@$(CXX) $(CPPFLAGS) -o $@ -c $<
 
-$(FINAL_BIN): build $(COBJECTS)
-	@echo " CXX " $<
-	@$(CXX) -o $(FINAL_BIN) -pthread $(COBJECTS)
+$(FINAL_BIN):
+	mkdir -p build; cd build; cmake ..; make -j
 
 build:
 	mkdir -p build
@@ -46,7 +45,6 @@ build:
 clean:
 	$(MAKE) -s -f Makefile.kernel clean
 	@rm -rf build
-
 
 
 kern: build
