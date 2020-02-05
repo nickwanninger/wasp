@@ -361,6 +361,12 @@ void kvm_machine::reset(void) {
   // printf("done cleaning\n");
 }
 
+
+
+
+uint32_t kvm_machine::num_cpus(void) {return cpus.size(); }
+mobo::vcpu &kvm_machine::cpu(uint32_t i) {return cpus[i]; }
+
 void kvm_vcpu::reset(void) {
   ioctl(cpufd, KVM_SET_REGS, &initial_regs);
   ioctl(cpufd, KVM_SET_SREGS, &initial_sregs);

@@ -16,9 +16,6 @@ namespace mobo {
 class driver;
 
 class machine {
-
-  std::vector<std::unique_ptr<mobo::vcpu>> m_cpus;
-
  public:
   typedef std::shared_ptr<machine> ptr;
 
@@ -32,8 +29,6 @@ class machine {
   }
 
 
-  uint32_t num_cpus();
-  mobo::vcpu &cpu(uint32_t);
 
 
   /* Each platform must implement these methods */
@@ -41,6 +36,9 @@ class machine {
   virtual void run(workload &) = 0;
   virtual void *gpa2hpa(off_t gpa) = 0;
   virtual void reset() = 0;
+
+  virtual uint32_t num_cpus() = 0;
+  virtual mobo::vcpu &cpu(uint32_t) = 0;
 };
 
 

@@ -48,6 +48,7 @@ static std::shared_ptr<mobo::machine> get_clean(std::string &path,
   // allocate a new one
   mobo::machine::ptr v = mobo::platform::create(PLATFORM_ANY);
   v->allocate_ram(memsize);
+  v->load_elf(path);
   v->reset();
   return v;
 }

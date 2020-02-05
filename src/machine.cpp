@@ -32,6 +32,8 @@ m_driver.attach_memory(mem_size, memory);
 // TODO: abstract the loading of an elf file to a general function that takes
 //       some memory and a starting vcpu
 void machine::load_elf(std::string file) {
+
+  printf("hello\n");
   char *memory = (char *)gpa2hpa(0);  // grab a char buffer reference to the mem
 
   ELFIO::elfio reader;
@@ -123,6 +125,3 @@ void machine::load_elf(std::string file) {
   }
 }
 
-uint32_t machine::num_cpus() { return m_cpus.size(); }
-
-mobo::vcpu &machine::cpu(uint32_t index) { return *m_cpus[index]; }
