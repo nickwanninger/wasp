@@ -26,13 +26,13 @@ namespace mobo {
 
 struct kvm_vcpu : public mobo::vcpu {
   int cpufd = -1;
-  int index = 0;
+  int index;
 
   char *mem;
   size_t memsize;
 
   struct kvm_run *kvm_run;
-  size_t run_size = 0;
+  size_t run_size;
 
   struct kvm_regs initial_regs;
   struct kvm_sregs initial_sregs;
@@ -93,9 +93,10 @@ class kvm_machine : public mobo::machine {
   kvm_machine(int kvmfd, int ncpus);
   ~kvm_machine() override;
 
-  void init_ram(size_t);
-  void run(workload &) override;
 
+  void allocate_ram(size_t) override;
+  void run(workload &) override;
+  void *gpa2hpa(off_t gpa) override;
   void reset() override;
 };
 

@@ -26,14 +26,6 @@ class machine {
   virtual ~machine();
   void load_elf(std::string file);
 
-  // give the machine nbytes bytes of ram, rounded up to nearest
-  // page boundary (4096 bytes)
-  virtual void allocate_ram(size_t) = 0;
-  virtual void run(workload &) = 0;
-  virtual void reset() = 0;
-
-  virtual void *gpa2hpa(off_t gpa) = 0;
-
   template <typename T>
   inline auto val_at(off_t gpa) -> T& {
     return *(T *)gpa2hpa(gpa);
@@ -42,6 +34,13 @@ class machine {
 
   uint32_t num_cpus();
   mobo::vcpu &cpu(uint32_t);
+
+
+  /* Each platform must implement these methods */
+  virtual void allocate_ram(size_t) = 0;
+  virtual void run(workload &) = 0;
+  virtual void *gpa2hpa(off_t gpa) = 0;
+  virtual void reset() = 0;
 };
 
 

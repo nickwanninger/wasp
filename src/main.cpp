@@ -238,6 +238,8 @@ void runner_2(mobo::machine::ptr vmp, int id) {
 
     zn_close_socket(socket);
 
+    /*
+
     auto tsc_buf = (uint64_t *)vm.gpa2hpa(0x1000);
     data_lock.lock();
 
@@ -252,6 +254,7 @@ void runner_2(mobo::machine::ptr vmp, int id) {
     }
     printf("\n");
     data_lock.unlock();
+    */
 
     nruns++;
 

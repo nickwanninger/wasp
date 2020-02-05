@@ -149,7 +149,7 @@ void kvm_machine::attach_bank(ram_bank &&bnk) {
   ram.push_back(std::move(bnk));
 }
 
-void kvm_machine::init_ram(size_t nbytes) {
+void kvm_machine::allocate_ram(size_t nbytes) {
   if (this->mem != nullptr) {
     munmap(this->mem, this->memsize);
   }
@@ -167,6 +167,11 @@ void kvm_machine::init_ram(size_t nbytes) {
   bnk.size = nbytes;
   bnk.host_addr = this->mem;
   attach_bank(std::move(bnk));
+}
+
+
+void *kvm_machine::gpa2hpa(off_t gpa) {
+  return (void*)(gpa + (char*)mem);
 }
 
 // #define RECORD_VMEXIT_LIFETIME
@@ -575,9 +580,8 @@ static int kvmfd = -1;
 
 static machine::ptr kvm_allocate(void) {
   if (kvmfd == -1) kvmfd = open("/dev/kvm", O_RDWR);
-  printf("it works!\n");
-  exit(0);
-  return NULL;
+
+  return std::make_shared<kvm_machine>(kvmfd, 1);
 }
 
 static mobo::platform::registration __kvm__reg__ __register_platform = {
