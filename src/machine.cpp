@@ -1,44 +1,38 @@
 #include <inttypes.h>
-
 #include <mobo/machine.h>
 #include <stdio.h>
 //#include <sys/mman.h>
-#include <elfio/elfio.hpp>
-#include <mobo/types.h>
 #include <mobo/memwriter.h>
+#include <mobo/types.h>
 #include <mobo/vcpu.h>
+
+#include <elfio/elfio.hpp>
 
 using namespace mobo;
 
-mobo::machine::machine(driver &d) : m_driver(d) {
-  // init some machine state
-}
+mobo::machine::~machine(void) {}
 
-mobo::machine::~machine(void) {
-  // clean up machine state
-  if (memory != nullptr) munmap(memory, mem_size);
-}
-
+/*
 void machine::allocate_ram(size_t nbytes) {
-  // round up to the nearest page boundary
-  if ((nbytes & 0xfff) != 0) {
-    nbytes &= ~0xfff;
-    nbytes += 0x1000;
-  }
-
-  memory = (char *)mmap(NULL, nbytes, PROT_READ | PROT_WRITE,
-                        MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-  mem_size = nbytes;
-
-  // attach to the driver
-  m_driver.attach_memory(mem_size, memory);
+// round up to the nearest page boundary
+if ((nbytes & 0xfff) != 0) {
+  nbytes &= ~0xfff;
+  nbytes += 0x1000;
 }
 
+memory = (char *)mmap(NULL, nbytes, PROT_READ | PROT_WRITE,
+                      MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+mem_size = nbytes;
+
+// attach to the driver
+m_driver.attach_memory(mem_size, memory);
+}
+*/
 
 // TODO: abstract the loading of an elf file to a general function that takes
 //       some memory and a starting vcpu
 void machine::load_elf(std::string file) {
-  char *memory = (char *)mem;  // grab a char buffer reference to the mem
+  char *memory = (char *)gpa2hpa(0);  // grab a char buffer reference to the mem
 
   ELFIO::elfio reader;
   reader.load(file);
@@ -64,6 +58,8 @@ void machine::load_elf(std::string file) {
   u64 hypertable = 0x5000;
 
   {
+    /*
+     * TODO: memory regions like mmap() has in a kernel.
     {
       // create a memory writer to the part of memory that represents the mbd
       memwriter hdr(memory + hypertable);
@@ -78,24 +74,25 @@ void machine::load_elf(std::string file) {
         hdr.write<u64>(bank.size);
       }
     }
+    */
 
     // setup general purpose registers
     {
       struct regs r;
-      cpus(0)->read_regs(r);
+      cpu(0).read_regs(r);
       r.rdi = 0x4242424242424242L;
       r.rsi = hypertable;  // TODO: The physical address of the hypertable
       // information
       r.rip = entry;
       r.rflags &= ~(1 << 17);
       r.rflags &= ~(1 << 9);
-      cpus(0)->write_regs(r);
+      cpu(0).write_regs(r);
     }
 
     // setup the special registers
     {
       sregs sr;
-      cpus(0)->read_sregs(sr);
+      cpu(0).read_sregs(sr);
 
       auto init_seg = [](mobo::segment &seg) {
         seg.present = 1;
@@ -121,23 +118,11 @@ void machine::load_elf(std::string file) {
       sr.cr0 &= ~(1 << 31);
       sr.cr0 |= (1 << 0);
 
-      cpus(0)->write_sregs(sr);
+      cpu(0).write_sregs(sr);
     }
   }
 }
 
-void machine::run() { return m_driver.run(); }
+uint32_t machine::num_cpus() { return m_cpus.size(); }
 
-void machine::reset() {
-  m_driver.reset();
-}
-
-uint32_t machine::num_cpus() { return m_driver.num_cpus(); }
-
-mobo::vcpu::ptr machine::cpus(uint32_t index)
-{
-  return m_driver.cpu(index);
-}
-
-// setter for a machine
-void driver::set_machine(machine *m) { m_machine = m; }
+mobo::vcpu &machine::cpu(uint32_t index) { return *m_cpus[index]; }

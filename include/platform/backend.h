@@ -7,7 +7,7 @@
 #include "platform/windows/hyperv_driver.h"
 
 #elif __linux__
-#include "platform/linux/kvm_driver.h"
+#include "platform/linux/kvm.h"
 
 #else
 #error "unsupported platform"

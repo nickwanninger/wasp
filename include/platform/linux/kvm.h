@@ -49,7 +49,7 @@ struct kvm_vcpu : public mobo::vcpu {
   void read_fregs(fpu_regs &) override;
   void write_fregs(fpu_regs &) override;
 
-  void dump_state(FILE *, char *mem = nullptr) override;
+  // void dump_state(FILE *, char *mem = nullptr) override;
 
   void *translate_address(u64 gva) override;
   void reset(void) override;
@@ -62,7 +62,7 @@ struct ram_bank {
   size_t size;
 };
 
-class kvm_driver : public mobo::driver {
+class kvm_machine : public mobo::machine {
  private:
   void *mem;
   size_t memsize;
@@ -80,20 +80,21 @@ class kvm_driver : public mobo::driver {
 
   std::string path;
 
+  bool halted = false;
+  bool shutdown = false;
+
+
  public:
 
   inline void *mem_addr(off_t o) {
     return (void*)((char*)mem + o);
   }
 
-  bool halted = false;
-  bool shutdown = false;
-
-  kvm_driver(int kvmfd, int ncpus);
-  ~kvm_driver() override;
+  kvm_machine(int kvmfd, int ncpus);
+  ~kvm_machine() override;
 
   void init_ram(size_t);
-  void run(workload &);
+  void run(workload &) override;
 
   void reset() override;
 };

@@ -1,20 +1,19 @@
-#include "compiler_defs.h"
+#include <fcntl.h>
 
 #include <atomic>
 #include <condition_variable>
+#include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <mutex>
 #include <queue>
 #include <thread>
-#include <fcntl.h>
 
-#include <cstdint>
-#include <cstring>
-
-#include "platform/getopt.h"
-#include "platform/unistd.h"
-#include "platform/platform.h"
+#include "compiler_defs.h"
 #include "mobo/workload.h"
+#include "platform/getopt.h"
+#include "platform/platform.h"
+#include "platform/unistd.h"
 
 #define RAMSIZE (16 * 1024l * 1024l)
 
@@ -29,8 +28,6 @@ std::queue<mobo::machine::ptr> clean;
 std::queue<mobo::machine::ptr> dirty;
 std::condition_variable dirty_signal;
 
-mobo::context g_context;
-
 static void add_dirty(mobo::machine::ptr v) {
   dirty_lock.lock();
   dirty.push(v);
@@ -38,7 +35,8 @@ static void add_dirty(mobo::machine::ptr v) {
   dirty_signal.notify_one();
 }
 
-static std::shared_ptr<mobo::machine> get_clean(std::string &path, size_t memsize) {
+static std::shared_ptr<mobo::machine> get_clean(std::string &path,
+                                                size_t memsize) {
   {
     std::scoped_lock lck(clean_lock);
     if (!clean.empty()) {
@@ -48,12 +46,11 @@ static std::shared_ptr<mobo::machine> get_clean(std::string &path, size_t memsiz
     }
   }
   // allocate a new one
-  mobo::machine::ptr v = g_context.create(mobo::driver_kind_any, 1);
-  v->init_ram(memsize);
+  mobo::machine::ptr v = mobo::platform::create(PLATFORM_ANY);
+  v->allocate_ram(memsize);
   v->reset();
   return v;
 }
-
 
 auto cleaner(void) {
   while (true) {
@@ -163,7 +160,8 @@ class tcp_workload : public workload {
 
   tcp_workload(zn_socket_t sock) : socket(sock) {}
 
-  int handle_hcall(struct mobo::regs &regs, size_t ramsize, void *ram) override {
+  int handle_hcall(struct mobo::regs &regs, size_t ramsize,
+                   void *ram) override {
     nhcalls++;
 
     // send
@@ -217,8 +215,9 @@ static void add_sock(int sock) {
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
-void runner_2(kvm_driver *vm, int id) {
-    zn_set_affinity(id);
+void runner_2(mobo::machine::ptr vmp, int id) {
+  auto &vm = *vmp;
+  zn_set_affinity(id);
 
   while (true) {
     std::unique_lock<std::mutex> lk(socket_lock);
@@ -235,11 +234,11 @@ void runner_2(kvm_driver *vm, int id) {
 
     tcp_workload conn(socket);
     // run the vm
-    vm->run(conn);
+    vm.run(conn);
 
     zn_close_socket(socket);
 
-    auto tsc_buf = (uint64_t *)vm->mem_addr(0x1000);
+    auto tsc_buf = (uint64_t *)vm.gpa2hpa(0x1000);
     data_lock.lock();
 
     printf("%d, ", run_count++);
@@ -257,7 +256,7 @@ void runner_2(kvm_driver *vm, int id) {
     nruns++;
 
     // reset the vm
-    vm->reset();
+    vm.reset();
   }
 }
 #pragma clang diagnostic pop
@@ -266,8 +265,7 @@ void runner_2(kvm_driver *vm, int id) {
 #define PORT 8000
 #define BACKLOG 1000 /* how many pending connections queue will hold */
 
-void run_server()
-{
+void run_server() {
   zn_socket_t server_fd;
   struct sockaddr_in my_addr = {};     /* my address information */
   struct sockaddr_in client_addr = {}; /* connector's address information */
@@ -283,14 +281,11 @@ void run_server()
   my_addr.sin_addr.s_addr = INADDR_ANY; /* auto-fill with my IP */
 
   int optval = 1;
-  setsockopt(
-      server_fd,
-      SOL_SOCKET,
-      SO_REUSEADDR,
-      (const char *) &optval,
-      sizeof(int));
+  setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&optval,
+             sizeof(int));
 
-  if (bind(server_fd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)) == -1) {
+  if (bind(server_fd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)) ==
+      -1) {
     perror("bind");
     exit(1);
   }
@@ -326,8 +321,7 @@ void run_server()
   }
 }
 
-int test_throughput_2(std::string path, int nrunners)
-{
+int test_throughput_2(std::string path, int nrunners) {
   int nprocs = zn_get_processors_count();
 
   size_t ramsize = 1 * 1024l * 1024l;
@@ -348,11 +342,6 @@ int test_throughput_2(std::string path, int nrunners)
 
 int main(int argc, char **argv) {
   if (argc == 1) return -1;
-
-  // TODO: not sure where this belongs
-#if __LINUX__
-  if (kvmfd == 0) kvmfd = open("/dev/kvm", O_RDWR);
-#endif
 
   int nprocs = zn_get_processors_count();
 

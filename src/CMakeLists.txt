@@ -19,7 +19,7 @@ target_sources(mobo
         main.cpp
         vcpu.cpp
         machine.cpp
-        context.cpp
+				platform.cpp
         )
 
 if (WIN32)
@@ -35,7 +35,7 @@ elseif(LINUX)
     target_sources(mobo
             PRIVATE
             platform/linux/platform.cpp
-            platform/linux/kvm_driver.cpp
+            platform/linux/kvm.cpp
             )
 else()
     message(FATAL_ERROR "Unsupported platform")

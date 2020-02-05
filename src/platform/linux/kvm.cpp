@@ -2,8 +2,8 @@
 #include <fcntl.h>
 #include <inttypes.h>  // PRIx64
 #include <linux/kvm.h>
-#include <platform/linux/kvm_driver.h>
 #include <mobo/multiboot.h>
+#include <platform/linux/kvm.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,7 +52,7 @@ struct cpuid_regs {
 #define MAX_KVM_CPUID_ENTRIES 100
 static void filter_cpuid(struct kvm_cpuid2 *);
 
-kvm_driver::kvm_driver(int kvmfd, int ncpus) : kvmfd(kvmfd), ncpus(ncpus) {
+kvm_machine::kvm_machine(int kvmfd, int ncpus) : kvmfd(kvmfd), ncpus(ncpus) {
   assert(ncpus == 1);  // for now...
 
   int ret;
@@ -75,7 +75,7 @@ kvm_driver::kvm_driver(int kvmfd, int ncpus) : kvmfd(kvmfd), ncpus(ncpus) {
   init_cpus();
 }
 
-mobo::kvm_driver::~kvm_driver() {
+mobo::kvm_machine::~kvm_machine() {
   // need to close the vmfd, and all cpu fds
   for (auto &cpu : cpus) {
     close(cpu.cpufd);
@@ -85,7 +85,7 @@ mobo::kvm_driver::~kvm_driver() {
   munmap(mem, memsize);
 }
 
-void kvm_driver::init_cpus(void) {
+void kvm_machine::init_cpus(void) {
   int kvm_run_size = ioctl(kvmfd, KVM_GET_VCPU_MMAP_SIZE, nullptr);
   // get cpuid info
   struct kvm_cpuid2 *kvm_cpuid;
@@ -138,7 +138,7 @@ void kvm_driver::init_cpus(void) {
   free(kvm_cpuid);
 }
 
-void kvm_driver::attach_bank(ram_bank &&bnk) {
+void kvm_machine::attach_bank(ram_bank &&bnk) {
   struct kvm_userspace_memory_region code_region = {
       .slot = (uint32_t)ram.size(),
       .guest_phys_addr = bnk.guest_phys_addr,
@@ -149,7 +149,7 @@ void kvm_driver::attach_bank(ram_bank &&bnk) {
   ram.push_back(std::move(bnk));
 }
 
-void kvm_driver::init_ram(size_t nbytes) {
+void kvm_machine::init_ram(size_t nbytes) {
   if (this->mem != nullptr) {
     munmap(this->mem, this->memsize);
   }
@@ -171,7 +171,7 @@ void kvm_driver::init_ram(size_t nbytes) {
 
 // #define RECORD_VMEXIT_LIFETIME
 
-void kvm_driver::run(workload &work) {
+void kvm_machine::run(workload &work) {
   auto &cpufd = cpus[0].cpufd;
   auto run = cpus[0].kvm_run;
 
@@ -335,7 +335,7 @@ static void filter_cpuid(struct kvm_cpuid2 *kvm_cpuid) {
   }
 }
 
-void kvm_driver::reset(void) {
+void kvm_machine::reset(void) {
   for (auto &cpu : cpus) {
     cpu.reset();
   }
@@ -356,36 +356,10 @@ void kvm_driver::reset(void) {
   // printf("done cleaning\n");
 }
 
-/* eflags masks */
-#define CC_C 0x0001
-#define CC_P 0x0004
-#define CC_A 0x0010
-#define CC_Z 0x0040
-#define CC_S 0x0080
-#define CC_O 0x0800
-
-#define TF_SHIFT 8
-#define IOPL_SHIFT 12
-#define VM_SHIFT 17
-
-#define TF_MASK 0x00000100
-#define IF_MASK 0x00000200
-#define DF_MASK 0x00000400
-#define IOPL_MASK 0x00003000
-#define NT_MASK 0x00004000
-#define RF_MASK 0x00010000
-#define VM_MASK 0x00020000
-#define AC_MASK 0x00040000
-#define VIF_MASK 0x00080000
-#define VIP_MASK 0x00100000
-#define ID_MASK 0x00200000
-
-
 void kvm_vcpu::reset(void) {
   ioctl(cpufd, KVM_SET_REGS, &initial_regs);
   ioctl(cpufd, KVM_SET_SREGS, &initial_sregs);
   ioctl(cpufd, KVM_SET_FPU, &initial_fpu);
-
 }
 
 void kvm_vcpu::read_regs(regs &r) {
@@ -597,3 +571,17 @@ void *kvm_vcpu::translate_address(u64 gva) {
   return mem + tr.physical_address;
 }
 
+static int kvmfd = -1;
+
+static machine::ptr kvm_allocate(void) {
+  if (kvmfd == -1) kvmfd = open("/dev/kvm", O_RDWR);
+  printf("it works!\n");
+  exit(0);
+  return NULL;
+}
+
+static mobo::platform::registration __kvm__reg__ __register_platform = {
+    .name = "KVM",
+    .flags = PLATFORM_LINUX,
+    .allocate = kvm_allocate,
+};
