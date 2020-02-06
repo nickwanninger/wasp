@@ -98,6 +98,10 @@ class kvm_machine : public mobo::machine {
   void run(workload &) override;
   void *gpa2hpa(off_t gpa) override;
   void reset() override;
+
+
+  uint32_t num_cpus() override;
+  mobo::vcpu &cpu(uint32_t) override;
 };
 
 }  // namespace mobo

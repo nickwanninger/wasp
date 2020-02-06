@@ -235,6 +235,14 @@ void hyperv_machine::map_guest_physical_addr_range(
   }
 }
 
+uint32_t hyperv_machine::num_cpus() {
+  return cpu_.size();
+}
+
+mobo::vcpu &hyperv_machine::cpu(uint32_t index) {
+  return cpu_[index];
+}
+
 static machine::ptr hyperv_allocate(void) {
   return std::make_shared<hyperv_machine>(1);
 }
