@@ -27,6 +27,8 @@ public:
 
   void *translate_address(u64 gva) override;
   void reset() override;
+
+  WHV_RUN_VP_EXIT_CONTEXT run();
 };
 
 }

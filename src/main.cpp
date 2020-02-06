@@ -1,5 +1,6 @@
-#include <fcntl.h>
+#include "compiler_defs.h"
 
+#include <fcntl.h>
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
@@ -9,7 +10,6 @@
 #include <queue>
 #include <thread>
 
-#include "compiler_defs.h"
 #include "mobo/workload.h"
 #include "platform/getopt.h"
 #include "platform/platform.h"

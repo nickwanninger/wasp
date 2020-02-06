@@ -1,10 +1,9 @@
-#include <WinHvPlatform.h>
-#include <winnt.h>
-#include <winerror.h>
-#include <stdexcept>
-
-#include "platform/windows/hyperv_vcpu.h"
 #include "compiler_defs.h"
+#include <WinHvPlatform.h>
+#include <winerror.h>
+
+#include <stdexcept>
+#include "platform/windows/hyperv_vcpu.h"
 
 using namespace mobo;
 
@@ -44,11 +43,25 @@ const WHV_REGISTER_NAME k_hyperv_mapping_regnames[] = {
     WHvX64RegisterRflags,
 };
 
-enum struct hyperv_mapping_reg_index : uint32_t {
-  rax = 0, rbx, rcx, rdx,
-  rsi, rdi, rsp, rbp,
-  r8, r9, r10, r11, r12, r13, r14, r15,
-  rip, rflags
+enum hyperv_mapping_reg_index : uint32_t {
+  rax = 0,
+  rbx,
+  rcx,
+  rdx,
+  rsi,
+  rdi,
+  rsp,
+  rbp,
+  r8,
+  r9,
+  r10,
+  r11,
+  r12,
+  r13,
+  r14,
+  r15,
+  rip,
+  rflags
 };
 
 const WHV_REGISTER_NAME k_hyperv_mapping_sregnames[] = {
@@ -73,7 +86,7 @@ const WHV_REGISTER_NAME k_hyperv_mapping_sregnames[] = {
     WHvX64RegisterApicBase,
 };
 
-enum struct hyperv_mapping_sreg_index : uint32_t {
+enum hyperv_mapping_sreg_index : uint32_t {
   cs = 0, ds, es, fs, gs, ss, tr,
   gdt, idt,
   cr0, cr2, cr3, cr4, cr8,
@@ -102,53 +115,53 @@ void hyperv_vcpu::read_regs(mobo::regs &r)
     throw std::runtime_error("failed to read Hyper-V registers");
   }
 
-  r.rax = values[hyperv_mapping_reg_index::rax];
-  r.rbx = values[hyperv_mapping_reg_index::rbx];
-  r.rcx = values[hyperv_mapping_reg_index::rcx];
-  r.rdx = values[hyperv_mapping_reg_index::rdx];
+  r.rax = values[hyperv_mapping_reg_index::rax].Reg64;
+  r.rbx = values[hyperv_mapping_reg_index::rbx].Reg64;
+  r.rcx = values[hyperv_mapping_reg_index::rcx].Reg64;
+  r.rdx = values[hyperv_mapping_reg_index::rdx].Reg64;
 
-  r.rsi = values[hyperv_mapping_reg_index::rsi];
-  r.rdi = values[hyperv_mapping_reg_index::rdi];
-  r.rsp = values[hyperv_mapping_reg_index::rsp];
-  r.rbp = values[hyperv_mapping_reg_index::rbp];
+  r.rsi = values[hyperv_mapping_reg_index::rsi].Reg64;
+  r.rdi = values[hyperv_mapping_reg_index::rdi].Reg64;
+  r.rsp = values[hyperv_mapping_reg_index::rsp].Reg64;
+  r.rbp = values[hyperv_mapping_reg_index::rbp].Reg64;
 
-  r.r8 = values[hyperv_mapping_reg_index::r8];
-  r.r9 = values[hyperv_mapping_reg_index::r9];
-  r.r10 = values[hyperv_mapping_reg_index::r10];
-  r.r11 = values[hyperv_mapping_reg_index::r11];
-  r.r12 = values[hyperv_mapping_reg_index::r12];
-  r.r13 = values[hyperv_mapping_reg_index::r13];
-  r.r14 = values[hyperv_mapping_reg_index::r14];
-  r.r15 = values[hyperv_mapping_reg_index::r15];
+  r.r8 = values[hyperv_mapping_reg_index::r8].Reg64;
+  r.r9 = values[hyperv_mapping_reg_index::r9].Reg64;
+  r.r10 = values[hyperv_mapping_reg_index::r10].Reg64;
+  r.r11 = values[hyperv_mapping_reg_index::r11].Reg64;
+  r.r12 = values[hyperv_mapping_reg_index::r12].Reg64;
+  r.r13 = values[hyperv_mapping_reg_index::r13].Reg64;
+  r.r14 = values[hyperv_mapping_reg_index::r14].Reg64;
+  r.r15 = values[hyperv_mapping_reg_index::r15].Reg64;
 
-  r.rip = values[hyperv_mapping_reg_index::rip];
-  r.rflags = values[hyperv_mapping_reg_index::rflags];
+  r.rip = values[hyperv_mapping_reg_index::rip].Reg64;
+  r.rflags = values[hyperv_mapping_reg_index::rflags].Reg64;
 }
 
 void hyperv_vcpu::write_regs(mobo::regs &r)
 {
   hyperv_reg_values_t values = {};
-  values[hyperv_mapping_reg_index::rax] = r.rax;
-  values[hyperv_mapping_reg_index::rbx] = r.rbx;
-  values[hyperv_mapping_reg_index::rcx] = r.rcx;
-  values[hyperv_mapping_reg_index::rdx] = r.rdx;
+  values[hyperv_mapping_reg_index::rax].Reg64 = r.rax;
+  values[hyperv_mapping_reg_index::rbx].Reg64 = r.rbx;
+  values[hyperv_mapping_reg_index::rcx].Reg64 = r.rcx;
+  values[hyperv_mapping_reg_index::rdx].Reg64 = r.rdx;
 
-  values[hyperv_mapping_reg_index::rsi] = r.rsi;
-  values[hyperv_mapping_reg_index::rdi] = r.rdi;
-  values[hyperv_mapping_reg_index::rsp] = r.rsp;
-  values[hyperv_mapping_reg_index::rbp] = r.rbp;
+  values[hyperv_mapping_reg_index::rsi].Reg64 = r.rsi;
+  values[hyperv_mapping_reg_index::rdi].Reg64 = r.rdi;
+  values[hyperv_mapping_reg_index::rsp].Reg64 = r.rsp;
+  values[hyperv_mapping_reg_index::rbp].Reg64 = r.rbp;
 
-  values[hyperv_mapping_reg_index::r8] = r.r8;
-  values[hyperv_mapping_reg_index::r9] = r.r9;
-  values[hyperv_mapping_reg_index::r10] = r.r10;
-  values[hyperv_mapping_reg_index::r11] = r.r11;
-  values[hyperv_mapping_reg_index::r12] = r.r12;
-  values[hyperv_mapping_reg_index::r13] = r.r13;
-  values[hyperv_mapping_reg_index::r14] = r.r14;
-  values[hyperv_mapping_reg_index::r15] = r.r15;
+  values[hyperv_mapping_reg_index::r8].Reg64 = r.r8;
+  values[hyperv_mapping_reg_index::r9].Reg64 = r.r9;
+  values[hyperv_mapping_reg_index::r10].Reg64 = r.r10;
+  values[hyperv_mapping_reg_index::r11].Reg64 = r.r11;
+  values[hyperv_mapping_reg_index::r12].Reg64 = r.r12;
+  values[hyperv_mapping_reg_index::r13].Reg64 = r.r13;
+  values[hyperv_mapping_reg_index::r14].Reg64 = r.r14;
+  values[hyperv_mapping_reg_index::r15].Reg64 = r.r15;
 
-  values[hyperv_mapping_reg_index::rip] = r.rip;
-  values[hyperv_mapping_reg_index::rflags] = r.rflags;
+  values[hyperv_mapping_reg_index::rip].Reg64 = r.rip;
+  values[hyperv_mapping_reg_index::rflags].Reg64 = r.rflags;
 
   HRESULT result;
   result = WHvSetVirtualProcessorRegisters(
@@ -212,14 +225,14 @@ void hyperv_vcpu::read_sregs(mobo::sregs &r) {
   r.idt.base = idt.Base;
   r.idt.limit = idt.Limit;
 
-  r.cr0 = values[hyperv_mapping_sreg_index::cr0];
-  r.cr2 = values[hyperv_mapping_sreg_index::cr2];
-  r.cr3 = values[hyperv_mapping_sreg_index::cr3];
-  r.cr4 = values[hyperv_mapping_sreg_index::cr4];
-  r.cr8 = values[hyperv_mapping_sreg_index::cr8];
+  r.cr0 = values[hyperv_mapping_sreg_index::cr0].Reg64;
+  r.cr2 = values[hyperv_mapping_sreg_index::cr2].Reg64;
+  r.cr3 = values[hyperv_mapping_sreg_index::cr3].Reg64;
+  r.cr4 = values[hyperv_mapping_sreg_index::cr4].Reg64;
+  r.cr8 = values[hyperv_mapping_sreg_index::cr8].Reg64;
 
-  r.efer = values[hyperv_mapping_sreg_index::efer];
-  r.apic_base = values[hyperv_mapping_sreg_index::apic_base];
+  r.efer = values[hyperv_mapping_sreg_index::efer].Reg64;
+  r.apic_base = values[hyperv_mapping_sreg_index::apic_base].Reg64;
 
   // TODO
 //  for (int i = 0; i < (NR_INTERRUPTS + 63) / 64; i++) {
@@ -258,24 +271,24 @@ void hyperv_vcpu::write_sregs(mobo::sregs &r)
   copy_segment(r.tr, values[hyperv_mapping_sreg_index::tr]);
 
   WHV_REGISTER_VALUE gdt_value = {};
-  WHV_X64_SEGMENT_REGISTER &gdt = &gdt_value.Table;
+  WHV_X64_TABLE_REGISTER &gdt = gdt_value.Table;
   gdt.Base = r.gdt.base;
   gdt.Limit = r.gdt.limit;
   values[hyperv_mapping_sreg_index::gdt] = gdt_value;
 
   WHV_REGISTER_VALUE idt_value = {};
-  WHV_X64_TABLE_REGISTER &idt = &idt_value.Table;
+  WHV_X64_TABLE_REGISTER &idt = idt_value.Table;
   idt.Base = r.idt.base;
   idt.Limit = r.idt.limit;
 
-  values[hyperv_mapping_sreg_index::cr0] = r.cr0;
-  values[hyperv_mapping_sreg_index::cr2] = r.cr2;
-  values[hyperv_mapping_sreg_index::cr3] = r.cr3;
-  values[hyperv_mapping_sreg_index::cr4] = r.cr4;
-  values[hyperv_mapping_sreg_index::cr8] = r.cr8;
+  values[hyperv_mapping_sreg_index::cr0].Reg64 = r.cr0;
+  values[hyperv_mapping_sreg_index::cr2].Reg64 = r.cr2;
+  values[hyperv_mapping_sreg_index::cr3].Reg64 = r.cr3;
+  values[hyperv_mapping_sreg_index::cr4].Reg64 = r.cr4;
+  values[hyperv_mapping_sreg_index::cr8].Reg64 = r.cr8;
 
-  values[hyperv_mapping_sreg_index::efer] = r.efer;
-  values[hyperv_mapping_sreg_index::apic_base] = r.apic_base;
+  values[hyperv_mapping_sreg_index::efer].Reg64 = r.efer;
+  values[hyperv_mapping_sreg_index::apic_base].Reg64 = r.apic_base;
 
   // TODO
 //  for (int i = 0; i < (NR_INTERRUPTS + 63) / 64; i++) {
@@ -312,5 +325,20 @@ void *hyperv_vcpu::translate_address(u64 gva)
 void hyperv_vcpu::reset()
 {
   // TODO
+}
+
+WHV_RUN_VP_EXIT_CONTEXT hyperv_vcpu::run() {
+  WHV_RUN_VP_EXIT_CONTEXT exit_context = {};
+  HRESULT hr = WHvRunVirtualProcessor(
+      partition_handle_,
+      cpu_index_,
+      &exit_context,
+      sizeof(exit_context));
+
+  if (FAILED(hr)) {
+    throw std::runtime_error("failed to run virtual processor: WHvRunVirtualProcessor");
+  }
+
+  return exit_context;
 }
 

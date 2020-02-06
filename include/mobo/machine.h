@@ -31,10 +31,8 @@ class machine {
     return *(T *)gpa2hpa(gpa);
   }
 
-
   uint32_t num_cpus();
   mobo::vcpu &cpu(uint32_t);
-
 
   /* Each platform must implement these methods */
   virtual void allocate_ram(size_t) = 0;
@@ -59,9 +57,23 @@ struct registration {
 };
 };  // namespace platform
 
+#ifdef _MSC_VER
+
+#define IGNORE_UNUSED __pragma(warning(suppress:4100))
+
+#define __register_platform              \
+   __pragma(section("vm_platforms", read)) \
+   IGNORE_UNUSED __declspec(align(sizeof(void *)))
+
+#else
+
+#define IGNORE_UNUSED __attribute__((__used__))
+
 #define __register_platform                \
-  __attribute__((__used__)) __attribute__( \
+  IGNORE_UNUSED __attribute__( \
       (unused, __section__("vm_platforms"), aligned(sizeof(void *))))
+
+#endif
 
 }  // namespace mobo
 

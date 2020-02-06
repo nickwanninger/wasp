@@ -6,6 +6,8 @@
 #include <functional>
 #include <vector>
 #include <memory>
+#include <stdexcept>
+
 #include <mobo/types.h>
 
 

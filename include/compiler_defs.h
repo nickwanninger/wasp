@@ -2,8 +2,10 @@
 
 #include <cstdint>
 
-#ifdef __GNUC__
-  #if __GNUC__ < 8
-    #error "require gcc >= 8.x"
-  #endif
+#ifdef _WIN32
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <winsock2.h>
+
 #endif

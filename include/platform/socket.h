@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../compiler_defs.h"
+
 #ifdef _WIN32
 #include "windows/socket.h"
 

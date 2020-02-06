@@ -1,25 +1,34 @@
 cmake_minimum_required(VERSION 3.10)
 project(mobo CXX)
 
-
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 add_executable(mobo "")
 
-set_property(TARGET mobo PROPERTY CXX_STANDARD 17)
+# MSVC requires `/std:c++latest` for various features in C++17 (e.g. dot struct initializers)
+if (MSVC)
+    if (MSVC_VERSION GREATER_EQUAL 1900)
+        target_compile_options(mobo PRIVATE "/std:c++latest")
+    else()
+        message(FATAL_ERROR "MSVC version ${MSVC_VERSION} does not support C++17. Expected MSVC_VERSION >= 1900 (VS2015+)")
+    endif()
+else()
+    set_property(TARGET mobo PROPERTY CXX_STANDARD 17)
+endif()
 
 target_include_directories(mobo
         PUBLIC ../include)
 
-target_link_libraries(mobo Threads::Threads)
+target_link_libraries(mobo
+        PRIVATE Threads::Threads)
 
 target_sources(mobo
         PRIVATE
         main.cpp
         vcpu.cpp
         machine.cpp
-				platform.cpp
+        platform.cpp
         )
 
 if (WIN32)
@@ -28,7 +37,17 @@ if (WIN32)
             platform/windows/platform.cpp
             platform/windows/getopt.c
             platform/windows/hyperv_vcpu.cpp
-            platform/windows/hyperv_driver.cpp
+            platform/windows/hyperv_machine.cpp
+            )
+
+    target_compile_definitions(mobo
+            PRIVATE
+            _AMD64_)
+
+    target_link_libraries(mobo
+            PRIVATE
+            winhvplatform.lib  # Hyper-V
+            ws2_32.lib  # WinSock 2
             )
 
 elseif(LINUX)
