@@ -1,2 +1,2 @@
 # force all text files to stay in LF
-* text=lf
+* text eol=lf
