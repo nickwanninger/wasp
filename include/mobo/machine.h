@@ -45,33 +45,50 @@ class machine {
 #define PLATFORM_DARWIN (0b100)
 
 namespace platform {
+
 machine::ptr create(int platform);
 
 struct registration {
   const char *name;
-  int flags;
+  uint32_t flags;
   machine::ptr (*allocate)(void);
 };
-};  // namespace platform
+
+}  // namespace platform
+
+}  // namespace mobo
 
 #ifdef _MSC_VER
 
 #define IGNORE_UNUSED __pragma(warning(suppress:4100))
 
-#define __register_platform              \
-   __pragma(section("vm_platforms", read)) \
+// see https://stackoverflow.com/a/14783759/809572
+// for additional explination
+
+/*
+ * Declare `vm_platforms` section for MSVC linker.
+ * We need to declare the start and end using `$a` and `$z` which will be merged
+ * into the one section itself before the dollar sign.
+ */
+#pragma section("vm_platforms$a", read)
+#pragma section("vm_platforms$u", read)
+#pragma section("vm_platforms$z", read)
+
+#define __register_platform                \
+   __declspec(allocate("vm_platforms$u")) \
    IGNORE_UNUSED __declspec(align(sizeof(void *)))
 
 #else
 
 #define IGNORE_UNUSED __attribute__((__used__))
 
+extern mobo::platform::registration __start_vm_platforms[];
+extern mobo::platform::registration __stop_vm_platforms[];
+
 #define __register_platform                \
   IGNORE_UNUSED __attribute__( \
       (unused, __section__("vm_platforms"), aligned(sizeof(void *))))
 
 #endif
-
-}  // namespace mobo
 
 #endif

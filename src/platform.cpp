@@ -1,7 +1,21 @@
 #include <mobo/machine.h>
 
-extern mobo::platform::registration __start_vm_platforms[];
-extern mobo::platform::registration __stop_vm_platforms[];
+#ifdef _MSC_VER
+
+struct __phantom {};
+
+__declspec(allocate("vm_platforms$a"))
+__declspec(align(sizeof(void *)))
+static struct __phantom __msvc_start_vm_platforms;
+
+__declspec(allocate("vm_platforms$z"))
+__declspec(align(sizeof(void *)))
+static struct __phantom __msvc_stop_vm_platforms;
+
+const mobo::platform::registration *const __start_vm_platforms = reinterpret_cast<const mobo::platform::registration *const>(&__msvc_start_vm_platforms);
+const mobo::platform::registration *const __stop_vm_platforms = reinterpret_cast<const mobo::platform::registration *const>(&__msvc_stop_vm_platforms);
+
+#endif
 
 mobo::machine::ptr mobo::platform::create(int flags) {
 

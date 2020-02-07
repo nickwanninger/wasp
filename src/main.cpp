@@ -345,7 +345,10 @@ int test_throughput_2(std::string path, int nrunners) {
 }
 
 int main(int argc, char **argv) {
-  if (argc == 1) return -1;
+  if (argc <= 1) {
+    fprintf(stderr, "usage: mobo [kernel.elf]\n");
+    return -1;
+  }
 
   int nprocs = zn_get_processors_count();
 

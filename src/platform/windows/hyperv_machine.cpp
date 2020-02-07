@@ -180,7 +180,7 @@ hyperv_machine::allocate_guest_phys_memory(
   void *host_virtual_addr = allocate_virtual_memory(
       size,
       MEM_COMMIT | MEM_TOP_DOWN,
-      PAGE_READWRITE);
+      PAGE_EXECUTE_READWRITE);
 
   if (host_virtual_addr == nullptr) {
     throw std::runtime_error("failed to allocated virtual memory of size " + std::to_string(size) + " bytes");

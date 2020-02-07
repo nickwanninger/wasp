@@ -13,6 +13,9 @@ if (MSVC)
     else()
         message(FATAL_ERROR "MSVC version ${MSVC_VERSION} does not support C++17. Expected MSVC_VERSION >= 1900 (VS2015+)")
     endif()
+
+    set_target_properties(mobo PROPERTIES
+            VS_DEBUGGER_COMMAND_ARGUMENTS "kernel.elf")
 else()
     set_property(TARGET mobo PROPERTY CXX_STANDARD 17)
 endif()
