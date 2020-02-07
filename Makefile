@@ -2,6 +2,9 @@ CC = clang
 CXX = clang++
 AS = nasm
 
+
+.PHONY: tests
+
 STRUCTURE := $(shell find src -type d)
 CODEFILES := $(addsuffix /*,$(STRUCTURE))
 CODEFILES := $(wildcard $(CODEFILES))
@@ -29,7 +32,7 @@ CPPFLAGS:=$(CFLAGS) -std=c++17
 
 default: $(FINAL_BIN)
 
-all: $(FINAL_BIN) kern
+all: $(FINAL_BIN) kern tests
 
 build/%.cpp.o: %.cpp
 	@mkdir -p $(dir $@)
@@ -49,3 +52,7 @@ clean:
 
 kern: build
 	$(MAKE) -f Makefile.kernel
+
+
+tests:
+	@./build-tests.sh
