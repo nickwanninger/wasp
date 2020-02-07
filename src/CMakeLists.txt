@@ -39,6 +39,7 @@ if (WIN32)
             PRIVATE
             platform/windows/platform.cpp
             platform/windows/getopt.c
+            platform/windows/socket.cpp
             platform/windows/hyperv_vcpu.cpp
             platform/windows/hyperv_machine.cpp
             )

@@ -35,6 +35,8 @@ static void add_dirty(mobo::machine::ptr v) {
   dirty_signal.notify_one();
 }
 
+machine::ptr create_machine(const std::string &path, size_t memsize);
+
 static std::shared_ptr<mobo::machine> get_clean(std::string &path,
                                                 size_t memsize) {
   {
@@ -46,7 +48,13 @@ static std::shared_ptr<mobo::machine> get_clean(std::string &path,
     }
   }
   // allocate a new one
-  mobo::machine::ptr v = mobo::platform::create(PLATFORM_ANY);
+  machine::ptr v = create_machine(path, memsize);
+  return v;
+}
+
+machine::ptr create_machine(const std::string &path, size_t memsize)
+{
+  machine::ptr v = platform::create(PLATFORM_ANY);
   v->allocate_ram(memsize);
   v->load_elf(path);
   v->reset();
@@ -266,7 +274,7 @@ void runner_2(mobo::machine::ptr vmp, int id) {
 #pragma clang diagnostic pop
 
 #define MAX 80
-#define PORT 8000
+#define PORT 8080
 #define BACKLOG 1000 /* how many pending connections queue will hold */
 
 void run_server() {
@@ -274,8 +282,9 @@ void run_server() {
   struct sockaddr_in my_addr = {};     /* my address information */
   struct sockaddr_in client_addr = {}; /* connector's address information */
 
-  if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-    perror("socket");
+  zn_socket_init();
+  if ((server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1) {
+    throw std::runtime_error("failed to create socket");
     exit(1);
   }
 
@@ -290,12 +299,12 @@ void run_server() {
 
   if (bind(server_fd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)) ==
       -1) {
-    perror("bind");
+	throw std::runtime_error("failed to bind to socket");
     exit(1);
   }
 
   if (listen(server_fd, BACKLOG) == -1) {
-    perror("listen");
+	throw std::runtime_error("failed to listen to socket");
     exit(1);
   }
 
@@ -304,7 +313,7 @@ void run_server() {
     int fd;
     if ((fd = accept(server_fd, (struct sockaddr *)&client_addr, &sin_size)) ==
         -1) {
-      perror("accept");
+	  throw std::runtime_error("failed to accept connection on socket");
       continue;
     }
 
@@ -333,6 +342,7 @@ int test_throughput_2(std::string path, int nrunners) {
 
   for (int i = 0; i < nrunners; i++) {
     runners.emplace_back(runner_2, get_clean(path, ramsize), i % nprocs);
+    fprintf(stderr, "created machine #%d\n", i);
   }
 
   zn_set_affinity(nrunners + 1);
@@ -366,5 +376,9 @@ int main(int argc, char **argv) {
   // lele
   // signal(SIGPIPE, SIG_IGN);
 
+  nprocs = 1;
   test_throughput_2(argv[optind], nprocs);
+//  auto machine = create_machine(argv[optind], 1);
+  printf("success!");
+  getchar();
 }

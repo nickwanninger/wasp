@@ -33,7 +33,6 @@ m_driver.attach_memory(mem_size, memory);
 //       some memory and a starting vcpu
 void machine::load_elf(std::string file) {
 
-  printf("hello\n");
   char *memory = (char *)gpa2hpa(0);  // grab a char buffer reference to the mem
 
   ELFIO::elfio reader;

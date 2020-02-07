@@ -1,7 +1,11 @@
 #include <winerror.h>
 #include <WinHvPlatform.h>
+#include <processthreadsapi.h>
+#include <sysinfoapi.h>
+
 #include <stdexcept>
 #include <memoryapi.h>
+#include <atomic>
 
 #include "compiler_defs.h"
 #include "mobo/machine.h"
@@ -11,8 +15,12 @@
 
 using namespace mobo;
 
+const uint32_t hyperv_machine::PAGE_SIZE = hyperv_machine::get_page_size();
+
 hyperv_machine::hyperv_machine(uint32_t num_cpus)
     : cpu_()
+    , mem_(nullptr)
+    , mem_size_(0)
 {
   ensure_capability_or_throw();
 
@@ -176,6 +184,13 @@ hyperv_machine::allocate_guest_phys_memory(
     uint64_t guest_addr,
     size_t size)
 {
+  // IMPORTANT: Round up to the page size to prevent the call to
+  // `WHvMapGpaRange` failing
+  size_t size_over_page = size % PAGE_SIZE;
+  if (size_over_page > 0) {
+    size = size + (PAGE_SIZE - size_over_page);
+  }
+
   // Allocate top-down as to not disturb the guest VA
   void *host_virtual_addr = allocate_virtual_memory(
       size,
@@ -223,6 +238,11 @@ void hyperv_machine::map_guest_physical_addr_range(
     uint64_t size,
     WHV_MAP_GPA_RANGE_FLAGS flags)
 {
+  // IMPORTANT: Fails if `size` is not page aligned
+  if (size % PAGE_SIZE != 0) {
+    throw std::runtime_error("size must be page aligned to " + std::to_string(PAGE_SIZE) + " bytes");
+  }
+
   HRESULT hr = WHvMapGpaRange(
       handle,
       host_addr,
@@ -241,6 +261,21 @@ uint32_t hyperv_machine::num_cpus() {
 
 mobo::vcpu &hyperv_machine::cpu(uint32_t index) {
   return cpu_[index];
+}
+
+void hyperv_machine::free_virtual_memory(void *address, size_t size, DWORD free_type)
+{
+  BOOL result = VirtualFreeEx(GetCurrentProcess(), address, size, free_type);
+  if (result == 0) {
+    throw std::runtime_error("failed to free virtual memory");
+  }
+}
+
+uint32_t hyperv_machine::get_page_size() noexcept
+{
+  SYSTEM_INFO info;
+  GetNativeSystemInfo(&info);
+  return info.dwPageSize;
 }
 
 static machine::ptr hyperv_allocate(void) {
