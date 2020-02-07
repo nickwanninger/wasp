@@ -20,4 +20,10 @@ zn_sleep_micros(uint32_t usecs);
 int
 zn_close_socket(zn_socket_t socket);
 
+/**
+ * Runs any platform specific initialization to setup support for sockets
+ */
+void
+zn_socket_init();
+
 #endif
