@@ -1,0 +1,34 @@
+-include $(M)/Makefile
+
+
+ifdef M
+ifndef srcs
+$(error srcs not provided in program)
+endif
+endif
+
+out=build/$(M).bin
+outdir = $(dir $(out))
+
+
+# reify paths
+srcs:=$(srcs:%=$(M)/%)
+
+objs:=$(srcs:%=build/%.o)
+
+.PRECIOUS: $(objs)
+
+build_test: $(objs)
+	@mkdir -p $(outdir)
+	@mkdir -p build/$(M)
+	@echo " LD  " $<
+	@$(LD) -T test.ld $(LDFLAGS) -o build/$(M).elf $^ $(libs)
+	@objcopy -O binary build/$(M).elf $(out)
+
+
+
+
+build/%.asm.o: %.asm
+	@mkdir -p $(dir $@)
+	@echo " AS  " $<
+	@nasm -f elf64 -o $@ $<
