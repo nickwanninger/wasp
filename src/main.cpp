@@ -1,15 +1,17 @@
-#include "compiler_defs.h"
-
 #include <fcntl.h>
+
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <cstring>
+#include <elfio/elfio.hpp>
 #include <iostream>
 #include <mutex>
 #include <queue>
 #include <thread>
 
+#include "compiler_defs.h"
 #include "mobo/workload.h"
 #include "platform/getopt.h"
 #include "platform/platform.h"
@@ -18,6 +20,90 @@
 #define RAMSIZE (16 * 1024l * 1024l)
 
 using namespace mobo;
+
+class binary_loader {
+ public:
+  binary_loader() {}
+  virtual ~binary_loader() {}
+
+  virtual bool inject(mobo::machine &vm) = 0;
+};
+
+class elf_loader : public binary_loader {
+  ELFIO::elfio reader;
+
+ public:
+  elf_loader(std::string path) { reader.load(path); }
+
+  virtual bool inject(mobo::machine &vm) override {
+    auto entry = reader.get_entry();
+
+    auto secc = reader.sections.size();
+    for (int i = 0; i < secc; i++) {
+      auto psec = reader.sections[i];
+      auto type = psec->get_type();
+      if (psec->get_name() == ".comment") continue;
+
+      if (type == SHT_PROGBITS) {
+        auto size = psec->get_size();
+        if (size == 0) continue;
+        const char *data = psec->get_data();
+        auto dst = (char *)vm.gpa2hpa(psec->get_address());
+        memcpy(dst, data, size);
+      }
+    }
+
+    struct regs r;
+    vm.cpu(0).read_regs(r);
+    r.rip = entry;
+    vm.cpu(0).write_regs(r);
+
+    // XXX: should we do this?
+    struct sregs sr;
+    vm.cpu(0).read_sregs(sr);
+    sr.cs.base = 0;
+    sr.ds.base = 0;
+    vm.cpu(0).write_sregs(sr);
+
+    return true;
+  }
+};
+
+class flatbin_loader : public binary_loader {
+  std::string path;
+
+ public:
+  flatbin_loader(std::string path) : path(path) {}
+
+  virtual bool inject(mobo::machine &vm) override {
+    auto entry = 0x1000;
+
+    void *addr = vm.gpa2hpa(entry);
+
+    FILE *fp = fopen(path.data(), "r");
+
+    if (fp == NULL) return false;
+
+    fseek(fp, 0L, SEEK_END);
+    size_t sz = ftell(fp);
+    fseek(fp, 0L, SEEK_SET);
+    fread(addr, sz, 1, fp);
+
+    struct regs r;
+    vm.cpu(0).read_regs(r);
+    r.rip = entry;
+    vm.cpu(0).write_regs(r);
+
+    // XXX: should we do this?
+    struct sregs sr;
+    vm.cpu(0).read_sregs(sr);
+    sr.cs.base = 0;
+    sr.ds.base = 0;
+    vm.cpu(0).write_sregs(sr);
+
+    return true;
+  }
+};
 
 std::atomic<int> nruns = 0;
 std::atomic<int> nhcalls = 0;
@@ -52,11 +138,9 @@ static std::shared_ptr<mobo::machine> get_clean(std::string &path,
   return v;
 }
 
-machine::ptr create_machine(const std::string &path, size_t memsize)
-{
+machine::ptr create_machine(const std::string &path, size_t memsize) {
   machine::ptr v = platform::create(PLATFORM_ANY);
   v->allocate_ram(memsize);
-  v->load_elf(path);
   v->reset();
   return v;
 }
@@ -299,12 +383,12 @@ void run_server() {
 
   if (bind(server_fd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)) ==
       -1) {
-	throw std::runtime_error("failed to bind to socket");
+    throw std::runtime_error("failed to bind to socket");
     exit(1);
   }
 
   if (listen(server_fd, BACKLOG) == -1) {
-	throw std::runtime_error("failed to listen to socket");
+    throw std::runtime_error("failed to listen to socket");
     exit(1);
   }
 
@@ -313,7 +397,7 @@ void run_server() {
     int fd;
     if ((fd = accept(server_fd, (struct sockaddr *)&client_addr, &sin_size)) ==
         -1) {
-	  throw std::runtime_error("failed to accept connection on socket");
+      throw std::runtime_error("failed to accept connection on socket");
       continue;
     }
 
@@ -354,7 +438,63 @@ int test_throughput_2(std::string path, int nrunners) {
   return -1;
 }
 
+class double_workload : public workload {
+  int val = 20;
+
+  int handle_hcall(struct mobo::regs &regs, size_t ramsize,
+                   void *ram) override {
+    if (regs.rax == 0) {
+      regs.rbx = val;
+      return WORKLOAD_RES_OKAY;
+    }
+
+    if (regs.rax == 1) {
+      if (regs.rbx != val * 2) {
+        throw std::runtime_error("double test failed\n");
+      }
+      return WORKLOAD_RES_OKAY;
+    }
+    return WORKLOAD_RES_KILL;
+  }
+};
+
+class fib_workload : public workload {
+  int handle_hcall(struct mobo::regs &regs, size_t ramsize,
+                   void *ram) override {
+    printf("rax=%ld\n", regs.rax);
+    return WORKLOAD_RES_KILL;
+  }
+};
+
+template <class W, class L>
+bool run_test(std::string path) {
+  printf("test [%s]\n", path.data());
+
+  L loader(path);
+  W work;
+
+  auto vm = create_machine(path, 1 * 1024l * 1024l);
+  vm->reset();
+  loader.inject(*vm);
+  auto start = std::chrono::high_resolution_clock::now();
+  vm->run(work);
+
+  auto end = std::chrono::high_resolution_clock::now();
+
+
+  printf("    DONE %fms\n", std::chrono::duration_cast<std::chrono::duration<double>>(end - start) * 1000.0);
+
+  return true;
+}
+
 int main(int argc, char **argv) {
+  run_test<double_workload, flatbin_loader>("build/tests/double.bin");
+  run_test<double_workload, elf_loader>("build/tests/double.elf");
+
+  run_test<fib_workload, flatbin_loader>("build/tests/fib20.bin");
+  run_test<fib_workload, elf_loader>("build/tests/fib20.elf");
+  exit(0);
+
   if (argc <= 1) {
     fprintf(stderr, "usage: mobo [kernel.elf]\n");
     return -1;
@@ -378,7 +518,7 @@ int main(int argc, char **argv) {
 
   nprocs = 1;
   test_throughput_2(argv[optind], nprocs);
-//  auto machine = create_machine(argv[optind], 1);
+  //  auto machine = create_machine(argv[optind], 1);
   printf("success!");
   getchar();
 }
