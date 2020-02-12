@@ -466,33 +466,77 @@ class fib_workload : public workload {
   }
 };
 
+class boottime_workload : public workload {
+ public:
+  ~boottime_workload(void) { printf("\n"); }
+  int handle_hcall(struct mobo::regs &regs, size_t ramsize,
+                   void *ram) override {
+    if (regs.rax == 1) {
+      uint64_t *tsc = (uint64_t *)ram;
+
+      printf("Linux, ");
+
+      uint64_t baseline = tsc[0];
+      for (int i = 1; tsc[i] != 0; i++) {
+        printf("%4ld", tsc[i] - baseline);
+        if (tsc[i + 1] != 0) printf(",");
+      }
+      return WORKLOAD_RES_KILL;
+    }
+
+    return WORKLOAD_RES_OKAY;
+  }
+};
+
 template <class W, class L>
-bool run_test(std::string path) {
+bool run_test(std::string path, int run_count = 1,
+              const char *stdout_path = NULL) {
   printf("test [%s]\n", path.data());
 
   L loader(path);
-  W work;
+
+  int ofd = -1;
+
+  if (stdout_path != NULL) {
+    ofd = dup(1);
+    int new_fd = open(stdout_path, O_RDWR | O_CREAT | O_TRUNC, 0666);
+    dup2(new_fd, 1);
+    close(new_fd);
+  }
+
+  auto start = std::chrono::high_resolution_clock::now();
 
   auto vm = create_machine(path, 1 * 1024l * 1024l);
-  vm->reset();
-  loader.inject(*vm);
-  auto start = std::chrono::high_resolution_clock::now();
-  vm->run(work);
-
+  for (int i = 0; i < run_count; i++) {
+    W work;
+    vm->reset();
+    loader.inject(*vm);
+    vm->run(work);
+  }
   auto end = std::chrono::high_resolution_clock::now();
 
+  if (ofd != -1) {
+    dup2(ofd, 1);
+    close(ofd);
+  }
 
-  printf("    DONE %fms\n", std::chrono::duration_cast<std::chrono::duration<double>>(end - start) * 1000.0);
+  printf(
+      "    DONE %fms\n",
+      std::chrono::duration_cast<std::chrono::duration<double>>(end - start) *
+          1000.0);
 
   return true;
 }
 
 int main(int argc, char **argv) {
   run_test<double_workload, flatbin_loader>("build/tests/double.bin");
-  run_test<double_workload, elf_loader>("build/tests/double.elf");
+  // run_test<double_workload, elf_loader>("build/tests/double.elf");
 
   run_test<fib_workload, flatbin_loader>("build/tests/fib20.bin");
-  run_test<fib_workload, elf_loader>("build/tests/fib20.elf");
+  // run_test<fib_workload, elf_loader>("build/tests/fib20.elf");
+
+  run_test<boottime_workload, flatbin_loader>("build/tests/boottime.elf", 1000,
+                                              "data/boottime.csv");
   exit(0);
 
   if (argc <= 1) {

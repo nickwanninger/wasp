@@ -260,7 +260,7 @@ void kvm_machine::run(workload &work) {
 
     cpus[0].read_regs(regs);
 
-    printf("unhandled exit: %d at rip = %p\n", run->exit_reason,
+    fprintf(stderr, "unhandled exit: %d at rip = %p\n", run->exit_reason,
            (void *)regs.rip);
     return;
   }

@@ -15,4 +15,5 @@ class workload {
             struct mobo::regs &regs,
             size_t ramsize,
             void *ram) = 0;
+    virtual ~workload() = default;
 };
