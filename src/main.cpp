@@ -87,11 +87,16 @@ class flatbin_loader : public binary_loader {
     fseek(fp, 0L, SEEK_END);
     size_t sz = ftell(fp);
     fseek(fp, 0L, SEEK_SET);
+
     fread(addr, sz, 1, fp);
+
+    fclose(fp);
 
     struct regs r;
     vm.cpu(0).read_regs(r);
     r.rip = entry;
+    r.rsp = 0x1000;
+    r.rbp = 0x1000;
     vm.cpu(0).write_regs(r);
 
     // XXX: should we do this?
@@ -466,19 +471,36 @@ class fib_workload : public workload {
   }
 };
 
+static int boot_runc = 0;
+
 class boottime_workload : public workload {
  public:
+
+  boottime_workload(void) {
+    if (boot_runc == 0) {
+      printf("Platform, cli, lgdt, prot, in main\n");
+    }
+    boot_runc++;
+  }
   ~boottime_workload(void) { printf("\n"); }
   int handle_hcall(struct mobo::regs &regs, size_t ramsize,
                    void *ram) override {
     if (regs.rax == 1) {
       uint64_t *tsc = (uint64_t *)ram;
 
-      printf("Linux, ");
+#ifdef __linux__
+      printf("KVM, ");
+#endif
+
+#ifdef _WIN32
+      printf("Hyper-V, ");
+#endif
 
       uint64_t baseline = tsc[0];
-      for (int i = 1; tsc[i] != 0; i++) {
-        printf("%4ld", tsc[i] - baseline);
+      uint64_t overhead = tsc[1] - baseline;
+
+      for (int i = 2; tsc[i] != 0; i++) {
+        printf("%4ld", tsc[i] - baseline - overhead);
         if (tsc[i + 1] != 0) printf(",");
       }
       return WORKLOAD_RES_KILL;
@@ -487,6 +509,7 @@ class boottime_workload : public workload {
     return WORKLOAD_RES_OKAY;
   }
 };
+
 
 template <class W, class L>
 bool run_test(std::string path, int run_count = 1,
@@ -535,7 +558,7 @@ int main(int argc, char **argv) {
   run_test<fib_workload, flatbin_loader>("build/tests/fib20.bin");
   // run_test<fib_workload, elf_loader>("build/tests/fib20.elf");
 
-  run_test<boottime_workload, flatbin_loader>("build/tests/boottime.elf", 1000,
+  run_test<boottime_workload, flatbin_loader>("build/tests/boottime.bin", 1000,
                                               "data/boottime.csv");
   exit(0);
 

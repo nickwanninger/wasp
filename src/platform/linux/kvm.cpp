@@ -200,12 +200,9 @@ void kvm_machine::run(workload &work) {
 
     if (stat == KVM_EXIT_SHUTDOWN) {
       shutdown = true;
-      printf("SHUTDOWN (probably a triple fault)\n");
-
-      printf("%d\n", run->internal.suberror);
+      fprintf(stderr, "SHUTDOWN (probably a triple fault)\n");
 
       cpus[0].dump_state(stderr, (char *)this->mem);
-      throw std::runtime_error("triple fault");
       return;
     }
 
@@ -357,6 +354,7 @@ void kvm_machine::reset(void) {
                    */
 
   memset(mem, 0, memsize);
+
 
   // printf("done cleaning\n");
 }
