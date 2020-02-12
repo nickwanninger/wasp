@@ -475,7 +475,6 @@ static int boot_runc = 0;
 
 class boottime_workload : public workload {
  public:
-
   boottime_workload(void) {
     if (boot_runc == 0) {
       printf("Platform, cli, lgdt, prot, in main\n");
@@ -500,7 +499,9 @@ class boottime_workload : public workload {
       uint64_t overhead = tsc[1] - baseline;
 
       for (int i = 2; tsc[i] != 0; i++) {
-        printf("%4ld", tsc[i] - baseline - overhead);
+        auto prev = tsc[i - 1] - baseline - overhead;
+        auto curr = tsc[i] - baseline - overhead;
+        printf("%4ld", curr - prev);
         if (tsc[i + 1] != 0) printf(",");
       }
       return WORKLOAD_RES_KILL;
@@ -509,7 +510,6 @@ class boottime_workload : public workload {
     return WORKLOAD_RES_OKAY;
   }
 };
-
 
 template <class W, class L>
 bool run_test(std::string path, int run_count = 1,
