@@ -79,6 +79,10 @@ class flatbin_loader : public binary_loader {
     auto entry = 0x1000;
 
     void *addr = vm.gpa2hpa(entry);
+  	if (addr == nullptr)
+  	{
+        throw std::runtime_error("failed to convert GPA -> HPA, got nullptr");
+  	}
 
     FILE *fp = fopen(path.data(), "r");
 
@@ -93,13 +97,6 @@ class flatbin_loader : public binary_loader {
     vm.cpu(0).read_regs(r);
     r.rip = entry;
     vm.cpu(0).write_regs(r);
-
-    // XXX: should we do this?
-    struct sregs sr;
-    vm.cpu(0).read_sregs(sr);
-    sr.cs.base = 0;
-    sr.ds.base = 0;
-    vm.cpu(0).write_sregs(sr);
 
     return true;
   }
@@ -532,11 +529,12 @@ int main(int argc, char **argv) {
   run_test<double_workload, flatbin_loader>("build/tests/double.bin");
   // run_test<double_workload, elf_loader>("build/tests/double.elf");
 
-  run_test<fib_workload, flatbin_loader>("build/tests/fib20.bin");
+  // run_test<fib_workload, flatbin_loader>("build/tests/fib20.bin");
   // run_test<fib_workload, elf_loader>("build/tests/fib20.elf");
 
-  run_test<boottime_workload, flatbin_loader>("build/tests/boottime.elf", 1000,
-                                              "data/boottime.csv");
+  // run_test<boottime_workload, flatbin_loader>("build/tests/boottime.elf", 1000,
+  //                                             "data/boottime.csv");
+  getchar();
   exit(0);
 
   if (argc <= 1) {

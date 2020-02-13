@@ -179,7 +179,7 @@ void hyperv_vcpu::write_regs(mobo::regs &r)
 void hyperv_vcpu::read_sregs(mobo::sregs &r) {
   HRESULT result;
 
-  hyperv_reg_values_t values = {};
+  hyperv_sreg_values_t values = {};
   result = WHvGetVirtualProcessorRegisters(
       partition_handle_,
       cpu_index_,
@@ -192,7 +192,7 @@ void hyperv_vcpu::read_sregs(mobo::sregs &r) {
   }
 
   static auto copy_segment = [](mobo::segment &dst, WHV_REGISTER_VALUE &src_value) {
-    WHV_X64_SEGMENT_REGISTER src = src_value.Segment;
+    WHV_X64_SEGMENT_REGISTER &src = src_value.Segment;
 
     dst.base = src.Base;
     dst.limit = src.Limit;
@@ -242,10 +242,10 @@ void hyperv_vcpu::read_sregs(mobo::sregs &r) {
 
 void hyperv_vcpu::write_sregs(mobo::sregs &r)
 {
-  hyperv_reg_values_t values = {};
+  hyperv_sreg_values_t values = {};
 
   static auto copy_segment = [](mobo::segment &src, WHV_REGISTER_VALUE &dst_value) {
-    WHV_X64_SEGMENT_REGISTER dst = dst_value.Segment;
+    WHV_X64_SEGMENT_REGISTER &dst = dst_value.Segment;
 
     dst.Base = src.base;
     dst.Limit = src.limit;
@@ -324,7 +324,42 @@ void *hyperv_vcpu::translate_address(u64 gva)
 
 void hyperv_vcpu::reset()
 {
-  // TODO
+  struct mobo::regs r = {0};
+  struct mobo::sregs s = {0};
+
+  struct mobo::segment clone = {
+      .limit = 0xffff,
+      .type = 0x03,
+      .present = 1,
+  };
+	
+  s.cs = {
+      .limit = 0xffff,
+      .selector = 0x1000,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+      .type = 0x0b,
+      .present = 1,
+  };
+
+  s.tr = {
+      .limit = 0xffff,
+      .type = 0x0b,
+      .present = 1,
+  };
+	
+  s.ldt = {0};
+  s.es = clone;
+  s.ss = clone;
+  s.ds = clone;
+  s.es = clone;
+  s.fs = clone;
+  s.gdt.limit = 0xffff;
+  s.idt.limit = 0xffff;
+
+  r.rflags = 0x2;
+  s.cr0 = 0x60000010;
+
+  write_regs(r);
+  write_sregs(s);
 }
 
 WHV_RUN_VP_EXIT_CONTEXT hyperv_vcpu::run() {
