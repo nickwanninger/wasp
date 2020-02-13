@@ -104,6 +104,12 @@ void hyperv_machine::run(workload &work) {
   while (true) {
     halted = false;
 
+    mobo::regs snapshot_regs_pre = {};
+    cpu_[0].read_regs(snapshot_regs_pre);
+
+    mobo::sregs snapshot_sregs_pre = {};
+    cpu_[0].read_sregs(snapshot_sregs_pre);
+  	
     WHV_RUN_VP_EXIT_CONTEXT run = cpu_[0].run();
 
 //    if (stat == KVM_EXIT_SHUTDOWN) {
@@ -117,6 +123,13 @@ void hyperv_machine::run(workload &work) {
 //      return;
 //    }
 
+
+    mobo::regs snapshot_regs = {};
+    cpu_[0].read_regs(snapshot_regs);
+
+    mobo::sregs snapshot_sregs = {};
+    cpu_[0].read_sregs(snapshot_sregs);
+  	
     WHV_RUN_VP_EXIT_REASON reason = run.ExitReason;
 
     if (reason == WHvRunVpExitReasonX64IoPortAccess) {
@@ -171,11 +184,16 @@ void hyperv_machine::run(workload &work) {
 }
 
 void *hyperv_machine::gpa2hpa(off_t gpa) {
+  if (mem_ != nullptr) {
+    return (void*)((char*)mem_ + gpa);
+  }
   return nullptr;
 }
 
 void hyperv_machine::reset() {
-
+  for (hyperv_vcpu &vcpu : cpu_) {
+    vcpu.reset();
+  }
 }
 
 void *
