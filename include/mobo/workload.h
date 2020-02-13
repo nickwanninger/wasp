@@ -11,6 +11,8 @@
 
 class workload {
   public:
+
+    workload() = default;
     virtual int handle_hcall(
             struct mobo::regs &regs,
             size_t ramsize,
