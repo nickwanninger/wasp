@@ -340,24 +340,6 @@ void runner_2(mobo::machine::ptr vmp, int id) {
 
     zn_close_socket(socket);
 
-    /*
-
-    auto tsc_buf = (uint64_t *)vm.gpa2hpa(0x1000);
-    data_lock.lock();
-
-    printf("%d, ", run_count++);
-
-    u64 baseline = tsc_buf[0];
-    for (int i = 1; tsc_buf[i] != 0; i++) {
-      u64 tsc = tsc_buf[i];
-
-      printf("%zu", tsc - baseline);
-      if (tsc_buf[i + 1] != 0) printf(", ");
-    }
-    printf("\n");
-    data_lock.unlock();
-    */
-
     nruns++;
 
     // reset the vm
@@ -481,7 +463,7 @@ class boottime_workload : public workload {
  public:
   boottime_workload(void) {
     if (boot_runc == 0) {
-      printf("Platform, cli, lgdt, prot, in main\n");
+      printf("Platform, cli, lgdt, prot, in 32, id map, long, in 64\n");
     }
     boot_runc++;
   }
@@ -492,7 +474,7 @@ class boottime_workload : public workload {
       uint64_t *tsc = (uint64_t *)ram;
 
 #ifdef __linux__
-      printf("KVM, ");
+      printf("KVM Noserial, ");
 #endif
 
 #ifdef _WIN32
@@ -500,14 +482,21 @@ class boottime_workload : public workload {
 #endif
 
       uint64_t baseline = tsc[0];
-      uint64_t overhead = tsc[1] - baseline;
+      // uint64_t overhead = tsc[1] - baseline;
 
       for (int i = 2; tsc[i] != 0; i++) {
-        auto prev = tsc[i - 1] - baseline - overhead;
-        auto curr = tsc[i] - baseline - overhead;
+        auto prev = tsc[i - 1];
+        auto curr = tsc[i];
+
         printf("%4ld", curr - prev);
         if (tsc[i + 1] != 0) printf(",");
       }
+      /*
+      for (int i = 2; tsc[i] != 0; i++) {
+        printf("%4ld", tsc[i] - baseline);
+        if (tsc[i + 1] != 0) printf(",");
+      }
+      */
       return WORKLOAD_RES_KILL;
     }
 
