@@ -10,20 +10,23 @@ class hyperv_vcpu : public mobo::vcpu {
   WHV_PARTITION_HANDLE partition_handle_;
   uint32_t cpu_index_;
 
+  void reset_protected();
+  void reset_long();
+
 public:
   hyperv_vcpu(
       WHV_PARTITION_HANDLE partition_handle,
       uint32_t cpu_index);
 
   // GPR
-  void read_regs(mobo::regs &) override;
-  void write_regs(mobo::regs &) override;
+  void read_regs(mobo::regs_t &) override;
+  void write_regs(mobo::regs_t &) override;
   // SPR
-  void read_sregs(mobo::sregs &) override;
-  void write_sregs(mobo::sregs &) override;
+  void read_sregs(mobo::regs_special_t &) override;
+  void write_regs_special(mobo::regs_special_t &r) override;
   // FPR
-  void read_fregs(mobo::fpu_regs &) override;
-  void write_fregs(mobo::fpu_regs &) override;
+  void read_fregs(mobo::regs_fpu_t &) override;
+  void write_fregs(mobo::regs_fpu_t &) override;
 
   void *translate_address(u64 gva) override;
   void reset() override;

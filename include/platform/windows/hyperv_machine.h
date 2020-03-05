@@ -40,6 +40,8 @@ public:
 
   uint32_t num_cpus() override;
   mobo::vcpu &cpu(uint32_t) override;
+
+  uint64_t setup_long_paging();
 };
 
 }

@@ -40,7 +40,7 @@ namespace mobo {
 #define NR_INTERRUPTS 256
 
 // general purpose registers
-struct regs {
+struct regs_t {
   u64 rax, rbx, rcx, rdx;
   u64 rsi, rdi, rsp, rbp;
   u64 r8, r9, r10, r11;
@@ -49,26 +49,26 @@ struct regs {
 };
 
 // memory segmentation information
-struct segment {
+struct segment_t {
   u64 base;
   u32 limit;
   u16 selector;
   u8 type;
-  u8 present, dpl, db, s, l, g, avl;
+  u8 present, dpl, db, s, long_mode, granularity, available;
   u8 unusable;
 };
 
-struct dtable {
+struct dtable_t {
   u64 base;
   u16 limit;
 };
 
 // special purpose registers
-struct sregs {
+struct regs_special_t {
   /* out (KVM_GET_SREGS) / in (KVM_SET_SREGS) */
-  struct segment cs, ds, es, fs, gs, ss;
-  struct segment tr, ldt;
-  struct dtable gdt, idt;
+  struct segment_t cs, ds, es, fs, gs, ss;
+  struct segment_t tr, ldt;
+  struct dtable_t gdt, idt;
   u64 cr0, cr2, cr3, cr4, cr8;
   u64 efer;
   u64 apic_base;
@@ -76,7 +76,7 @@ struct sregs {
 };
 
 // Floating point registers
-struct fpu_regs {
+struct regs_fpu_t {
   u8 fpr[8][16];
   u16 fcw;
   u16 fsw;
@@ -94,14 +94,14 @@ class vcpu {
   typedef std::shared_ptr<vcpu> ptr;
 
   // GPR
-  virtual void read_regs(regs &) = 0;
-  virtual void write_regs(regs &) = 0;
+  virtual void read_regs(regs_t &) = 0;
+  virtual void write_regs(regs_t &) = 0;
   // SPR
-  virtual void read_sregs(sregs &) = 0;
-  virtual void write_sregs(sregs &) = 0;
+  virtual void read_sregs(regs_special_t &) = 0;
+  virtual void write_regs_special(regs_special_t &) = 0;
   // FPR
-  virtual void read_fregs(fpu_regs &) = 0;
-  virtual void write_fregs(fpu_regs &) = 0;
+  virtual void read_fregs(regs_fpu_t &) = 0;
+  virtual void write_fregs(regs_fpu_t &) = 0;
   virtual void dump_state(FILE *, char *mem = nullptr);
 
   // translate a guest virtual address into the host address

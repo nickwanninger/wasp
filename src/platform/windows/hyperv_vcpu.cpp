@@ -3,9 +3,11 @@
 #include <winerror.h>
 
 #include <stdexcept>
+#include "platform/memory.h"
 #include "platform/windows/hyperv_vcpu.h"
 
 using namespace mobo;
+using namespace mobo::memory;
 
 hyperv_vcpu::hyperv_vcpu(
     WHV_PARTITION_HANDLE partition_handle,
@@ -48,10 +50,12 @@ enum hyperv_mapping_reg_index : uint32_t {
   rbx,
   rcx,
   rdx,
+
   rsi,
   rdi,
   rsp,
   rbp,
+
   r8,
   r9,
   r10,
@@ -60,11 +64,12 @@ enum hyperv_mapping_reg_index : uint32_t {
   r13,
   r14,
   r15,
+
   rip,
   rflags
 };
 
-const WHV_REGISTER_NAME k_hyperv_mapping_sregnames[] = {
+const WHV_REGISTER_NAME k_hyperv_mapping_reg_special_names[] = {
     WHvX64RegisterCs,
     WHvX64RegisterDs,
     WHvX64RegisterEs,
@@ -75,6 +80,7 @@ const WHV_REGISTER_NAME k_hyperv_mapping_sregnames[] = {
 
     WHvX64RegisterGdtr,
     WHvX64RegisterIdtr,
+    WHvX64RegisterLdtr,
 
     WHvX64RegisterCr0,
     WHvX64RegisterCr2,
@@ -88,18 +94,18 @@ const WHV_REGISTER_NAME k_hyperv_mapping_sregnames[] = {
 
 enum hyperv_mapping_sreg_index : uint32_t {
   cs = 0, ds, es, fs, gs, ss, tr,
-  gdt, idt,
+  gdt, idt, ldt,
   cr0, cr2, cr3, cr4, cr8,
   efer, apic_base,
 };
 
 constexpr uint32_t k_hyperv_mapping_regs_count = std::extent<decltype(k_hyperv_mapping_regnames)>::value;
-constexpr uint32_t k_hyperv_mapping_sregs_count = std::extent<decltype(k_hyperv_mapping_sregnames)>::value;
+constexpr uint32_t k_hyperv_mapping_regs_special_count = std::extent<decltype(k_hyperv_mapping_reg_special_names)>::value;
 
 typedef WHV_REGISTER_VALUE hyperv_reg_values_t[k_hyperv_mapping_regs_count];
-typedef WHV_REGISTER_VALUE hyperv_sreg_values_t[k_hyperv_mapping_sregs_count];
+typedef WHV_REGISTER_VALUE hyperv_reg_special_values_t[k_hyperv_mapping_regs_special_count];
 
-void hyperv_vcpu::read_regs(mobo::regs &r)
+void hyperv_vcpu::read_regs(mobo::regs_t &r)
 {
   HRESULT result;
 
@@ -138,7 +144,7 @@ void hyperv_vcpu::read_regs(mobo::regs &r)
   r.rflags = values[hyperv_mapping_reg_index::rflags].Reg64;
 }
 
-void hyperv_vcpu::write_regs(mobo::regs &r)
+void hyperv_vcpu::write_regs(mobo::regs_t &r)
 {
   hyperv_reg_values_t values = {};
   values[hyperv_mapping_reg_index::rax].Reg64 = r.rax;
@@ -176,22 +182,22 @@ void hyperv_vcpu::write_regs(mobo::regs &r)
   }
 }
 
-void hyperv_vcpu::read_sregs(mobo::sregs &r) {
+void hyperv_vcpu::read_sregs(mobo::regs_special_t &r) {
   HRESULT result;
 
-  hyperv_sreg_values_t values = {};
+  hyperv_reg_special_values_t values = {};
   result = WHvGetVirtualProcessorRegisters(
       partition_handle_,
       cpu_index_,
-      k_hyperv_mapping_sregnames,
-      k_hyperv_mapping_sregs_count,
+      k_hyperv_mapping_reg_special_names,
+      k_hyperv_mapping_regs_special_count,
       values);
 
   if (FAILED(result)) {
     throw std::runtime_error("failed to read Hyper-V special registers");
   }
 
-  static auto copy_segment = [](mobo::segment &dst, WHV_REGISTER_VALUE &src_value) {
+  static auto copy_segment = [](mobo::segment_t &dst, WHV_REGISTER_VALUE &src_value) {
     WHV_X64_SEGMENT_REGISTER &src = src_value.Segment;
 
     dst.base = src.Base;
@@ -203,9 +209,9 @@ void hyperv_vcpu::read_sregs(mobo::sregs &r) {
     dst.dpl = src.DescriptorPrivilegeLevel;
     dst.db = src.Default;
     dst.s = src.NonSystemSegment;
-    dst.l = src.Long;
-    dst.g = src.Granularity;
-    dst.avl = src.Available;
+    dst.long_mode = src.Long;
+    dst.granularity = src.Granularity;
+    dst.available = src.Available;
     dst.unusable = src.Reserved;
   };
 
@@ -224,7 +230,7 @@ void hyperv_vcpu::read_sregs(mobo::sregs &r) {
   WHV_X64_TABLE_REGISTER idt = values[hyperv_mapping_sreg_index::idt].Table;
   r.idt.base = idt.Base;
   r.idt.limit = idt.Limit;
-
+	
   r.cr0 = values[hyperv_mapping_sreg_index::cr0].Reg64;
   r.cr2 = values[hyperv_mapping_sreg_index::cr2].Reg64;
   r.cr3 = values[hyperv_mapping_sreg_index::cr3].Reg64;
@@ -240,11 +246,11 @@ void hyperv_vcpu::read_sregs(mobo::sregs &r) {
 //  }
 }
 
-void hyperv_vcpu::write_sregs(mobo::sregs &r)
+void hyperv_vcpu::write_regs_special(mobo::regs_special_t &r)
 {
-  hyperv_sreg_values_t values = {};
+  hyperv_reg_special_values_t values = {};
 
-  static auto copy_segment = [](mobo::segment &src, WHV_REGISTER_VALUE &dst_value) {
+  static auto copy_segment = [](mobo::segment_t &src, WHV_REGISTER_VALUE &dst_value) {
     WHV_X64_SEGMENT_REGISTER &dst = dst_value.Segment;
 
     dst.Base = src.base;
@@ -256,39 +262,41 @@ void hyperv_vcpu::write_sregs(mobo::sregs &r)
     dst.DescriptorPrivilegeLevel = src.dpl;
     dst.Default = src.db;
     dst.NonSystemSegment = src.s;
-    dst.Long = src.l;
-    dst.Granularity = src.g;
-    dst.Available = src.avl;
+    dst.Long = src.long_mode;
+    dst.Granularity = src.granularity;
+    dst.Available = src.available;
     dst.Reserved = src.unusable;
   };
 
-  copy_segment(r.cs, values[hyperv_mapping_sreg_index::cs]);
-  copy_segment(r.ds, values[hyperv_mapping_sreg_index::ds]);
-  copy_segment(r.es, values[hyperv_mapping_sreg_index::es]);
-  copy_segment(r.fs, values[hyperv_mapping_sreg_index::fs]);
-  copy_segment(r.gs, values[hyperv_mapping_sreg_index::gs]);
-  copy_segment(r.ss, values[hyperv_mapping_sreg_index::ss]);
-  copy_segment(r.tr, values[hyperv_mapping_sreg_index::tr]);
+  copy_segment(r.cs, values[cs]);
+  copy_segment(r.ds, values[ds]);
+  copy_segment(r.es, values[es]);
+  copy_segment(r.fs, values[fs]);
+  copy_segment(r.gs, values[gs]);
+  copy_segment(r.ss, values[ss]);
+  copy_segment(r.tr, values[tr]);
+  copy_segment(r.ldt, values[ldt]);
 
   WHV_REGISTER_VALUE gdt_value = {};
-  WHV_X64_TABLE_REGISTER &gdt = gdt_value.Table;
-  gdt.Base = r.gdt.base;
-  gdt.Limit = r.gdt.limit;
-  values[hyperv_mapping_sreg_index::gdt] = gdt_value;
+  WHV_X64_TABLE_REGISTER &gdt_reg = gdt_value.Table;
+  gdt_reg.Base = r.gdt.base;
+  gdt_reg.Limit = r.gdt.limit;
+  values[gdt] = gdt_value;
 
   WHV_REGISTER_VALUE idt_value = {};
-  WHV_X64_TABLE_REGISTER &idt = idt_value.Table;
-  idt.Base = r.idt.base;
-  idt.Limit = r.idt.limit;
+  WHV_X64_TABLE_REGISTER &idt_reg = idt_value.Table;
+  idt_reg.Base = r.idt.base;
+  idt_reg.Limit = r.idt.limit;
+  values[idt] = idt_value;
 
-  values[hyperv_mapping_sreg_index::cr0].Reg64 = r.cr0;
-  values[hyperv_mapping_sreg_index::cr2].Reg64 = r.cr2;
-  values[hyperv_mapping_sreg_index::cr3].Reg64 = r.cr3;
-  values[hyperv_mapping_sreg_index::cr4].Reg64 = r.cr4;
-  values[hyperv_mapping_sreg_index::cr8].Reg64 = r.cr8;
+  values[cr0].Reg64 = r.cr0;
+  values[cr2].Reg64 = r.cr2;
+  values[cr3].Reg64 = r.cr3;
+  values[cr4].Reg64 = r.cr4;
+  values[cr8].Reg64 = r.cr8;
 
-  values[hyperv_mapping_sreg_index::efer].Reg64 = r.efer;
-  values[hyperv_mapping_sreg_index::apic_base].Reg64 = r.apic_base;
+  values[efer].Reg64 = r.efer;
+  values[apic_base].Reg64 = r.apic_base;
 
   // TODO
 //  for (int i = 0; i < (NR_INTERRUPTS + 63) / 64; i++) {
@@ -299,8 +307,8 @@ void hyperv_vcpu::write_sregs(mobo::sregs &r)
   result = WHvSetVirtualProcessorRegisters(
       partition_handle_,
       cpu_index_,
-      k_hyperv_mapping_sregnames,
-      k_hyperv_mapping_sregs_count,
+      k_hyperv_mapping_reg_special_names,
+      k_hyperv_mapping_regs_special_count,
       values);
 
   if (FAILED(result)) {
@@ -308,11 +316,11 @@ void hyperv_vcpu::write_sregs(mobo::sregs &r)
   }
 }
 
-void hyperv_vcpu::read_fregs(mobo::fpu_regs &regs) {
+void hyperv_vcpu::read_fregs(mobo::regs_fpu_t &regs) {
   // TODO
 }
 
-void hyperv_vcpu::write_fregs(mobo::fpu_regs &regs) {
+void hyperv_vcpu::write_fregs(mobo::regs_fpu_t &regs) {
   // TODO
 }
 
@@ -324,42 +332,8 @@ void *hyperv_vcpu::translate_address(u64 gva)
 
 void hyperv_vcpu::reset()
 {
-  struct mobo::regs r = {0};
-  struct mobo::sregs s = {0};
-
-  struct mobo::segment clone = {
-      .limit = 0xffff,
-      .type = 0x03,
-      .present = 1,
-  };
-	
-  s.cs = {
-      .limit = 0xffff,
-      .selector = 0x1000,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
-      .type = 0x0b,
-      .present = 1,
-  };
-
-  s.tr = {
-      .limit = 0xffff,
-      .type = 0x0b,
-      .present = 1,
-  };
-	
-  s.ldt = {0};
-  s.es = clone;
-  s.ss = clone;
-  s.ds = clone;
-  s.es = clone;
-  s.fs = clone;
-  s.gdt.limit = 0xffff;
-  s.idt.limit = 0xffff;
-
-  r.rflags = 0x2;
-  s.cr0 = 0x60000010;
-
-  write_regs(r);
-  write_sregs(s);
+  // TODO: deal with protected mode, and figure out why it's broken...
+  reset_long();
 }
 
 WHV_RUN_VP_EXIT_CONTEXT hyperv_vcpu::run() {
@@ -375,5 +349,116 @@ WHV_RUN_VP_EXIT_CONTEXT hyperv_vcpu::run() {
   }
 
   return exit_context;
+}
+
+void hyperv_vcpu::reset_protected()
+{
+  struct mobo::regs_t r = {0};
+  struct mobo::regs_special_t s = {0};
+
+  struct mobo::segment_t clone = {
+      .limit = 0xffff,
+      .type = 0x03,
+      .present = 1,
+  };
+
+  s.cs = {
+      .limit = 0xffff,
+      .selector = 0x1000,
+      .type = 0x0b,
+      .present = 1,
+  };
+
+  s.tr = {
+      .limit = 0xffff,
+      .type = 0x0b,
+      .present = 1,
+  };
+
+  s.ldt = {0};
+  s.es = clone;
+  s.ss = clone;
+  s.ds = clone;
+  s.es = clone;
+  s.fs = clone;
+  s.gdt.limit = 0xffff;
+  s.idt.limit = 0xffff;
+
+  r.rflags = 0x2;
+  s.cr0 = 0x60000010;
+
+  write_regs(r);
+  write_regs_special(s);
+}
+
+void hyperv_vcpu::reset_long()
+{
+  struct mobo::regs_t r = {};
+  struct mobo::regs_special_t s = {};
+  read_regs(r);
+  read_sregs(s);
+
+  // see https://wiki.osdev.org/CPU_Registers_x86#CR0
+  uint64_t CR0_PE = 1u << 0u; // protected mode enable
+  uint64_t CR0_MP = 1u << 1u; // monitor co-processor
+  uint64_t CR0_ET = 1u << 4u; // extension type
+  uint64_t CR0_NE = 1u << 5u; // numeric error
+  uint64_t CR0_WP = 1u << 16u; // write protect
+  uint64_t CR0_AM = 1u << 18u; // alighnment mask
+  uint64_t CR0_PG = 1u << 31u; // paging
+
+  uint64_t CR4_PAE = 1u << 5u; // physical address extension
+  uint64_t CR4_OSFXSR = 1u << 9u; //	os support for fxsave and fxrstor instructions
+  uint64_t CR4_OSXMMEXCPT = 1u << 10u; // os support for unmasked simd floating point exceptions
+
+  // see https://en.wikipedia.org/wiki/Control_register#EFER
+  // EFER (Extended Feature Enable Register)
+  uint64_t EFER_LME = 1u << 8u;  // long mode enable
+  uint64_t EFER_LMA = 1u << 10u; // long mode active
+
+  // Enable paging
+  s.cr3 = PML4_PHYSICAL_ADDRESS;
+  s.cr4 = CR4_PAE | CR4_OSFXSR | CR4_OSXMMEXCPT;
+  s.cr0 = CR0_PE | CR0_MP | CR0_ET | CR0_NE | CR0_WP | CR0_AM | CR0_PG;
+  s.efer = EFER_LME | EFER_LMA;
+
+  // Set segment registers with long mode flag
+  s.cs = {
+      .base = 0,
+      .limit = 0xffffffff,
+      .selector = 1u << 3u,
+      .type = 11,
+      .present = 1,
+      .dpl = 0,
+      .long_mode = 1,
+      .granularity = 1,
+  };
+
+  s.ds = {
+      .base = 0,
+      .limit = 0xffffffff,
+      .selector = 2u << 3u,
+      .type = 3,
+      .present = 1,
+      .dpl = 0,
+      .long_mode = 1,
+      .granularity = 1,
+  };
+
+  // TODO: Assumes this wasn't touched during execution
+  struct segment_t segment = s.ss;
+  s.ds = segment;
+  s.es = segment;
+  s.gs = segment;
+
+  // Disable interrupts
+  r.rflags = 0x002;
+
+  // Set the actual PC and stack pointer
+  r.rip = 0x0;
+  r.rsp = 0x1000;
+
+  write_regs(r);
+  write_regs_special(s);
 }
 

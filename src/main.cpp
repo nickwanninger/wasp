@@ -53,17 +53,17 @@ class elf_loader : public binary_loader {
       }
     }
 
-    struct regs r;
+    struct regs_t r;
     vm.cpu(0).read_regs(r);
     r.rip = entry;
     vm.cpu(0).write_regs(r);
 
     // XXX: should we do this?
-    struct sregs sr;
+    struct regs_special_t sr;
     vm.cpu(0).read_sregs(sr);
     sr.cs.base = 0;
     sr.ds.base = 0;
-    vm.cpu(0).write_sregs(sr);
+    vm.cpu(0).write_regs_special(sr);
 
     return true;
   }
@@ -96,7 +96,7 @@ class flatbin_loader : public binary_loader {
 
     fclose(fp);
 
-    struct regs r;
+    struct regs_t r;
     vm.cpu(0).read_regs(r);
     r.rip = entry;
     r.rsp = 0x1000;
@@ -104,11 +104,11 @@ class flatbin_loader : public binary_loader {
     vm.cpu(0).write_regs(r);
 
     // XXX: should we do this?
-    struct sregs sr;
-    vm.cpu(0).read_sregs(sr);
-    sr.cs.base = 0;
-    sr.ds.base = 0;
-    vm.cpu(0).write_sregs(sr);
+//    struct regs_special_t sr;
+//    vm.cpu(0).read_sregs(sr);
+//    sr.cs.base = 0;
+//    sr.ds.base = 0;
+//    vm.cpu(0).write_regs_special(sr);
 
     return true;
   }
@@ -262,7 +262,7 @@ class tcp_workload : public workload {
 
   tcp_workload(zn_socket_t sock) : socket(sock) {}
 
-  int handle_hcall(struct mobo::regs &regs, size_t ramsize,
+  int handle_hcall(struct mobo::regs_t &regs, size_t ramsize,
                    void *ram) override {
     nhcalls++;
 
@@ -432,7 +432,7 @@ int test_throughput_2(std::string path, int nrunners) {
 class double_workload : public workload {
   int val = 20;
 
-  int handle_hcall(struct mobo::regs &regs, size_t ramsize,
+  int handle_hcall(struct mobo::regs_t &regs, size_t ramsize,
                    void *ram) override {
     if (regs.rax == 0) {
       regs.rbx = val;
@@ -450,7 +450,7 @@ class double_workload : public workload {
 };
 
 class fib_workload : public workload {
-  int handle_hcall(struct mobo::regs &regs, size_t ramsize,
+  int handle_hcall(struct mobo::regs_t &regs, size_t ramsize,
                    void *ram) override {
     printf("rax=%ld\n", regs.rax);
     return WORKLOAD_RES_KILL;
@@ -468,7 +468,7 @@ class boottime_workload : public workload {
     boot_runc++;
   }
   ~boottime_workload(void) { printf("\n"); }
-  int handle_hcall(struct mobo::regs &regs, size_t ramsize,
+  int handle_hcall(struct mobo::regs_t &regs, size_t ramsize,
                    void *ram) override {
     if (regs.rax == 1) {
       uint64_t *tsc = (uint64_t *)ram;
@@ -545,7 +545,7 @@ bool run_test(std::string path, int run_count = 1,
 }
 
 int main(int argc, char **argv) {
-  run_test<double_workload, flatbin_loader>("build/tests/double.bin");
+  run_test<double_workload, flatbin_loader>("build/tests/double64.bin");
   // run_test<double_workload, elf_loader>("build/tests/double.elf");
 
   run_test<fib_workload, flatbin_loader>("build/tests/fib20.bin");

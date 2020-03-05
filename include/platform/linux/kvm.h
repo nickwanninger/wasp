@@ -40,14 +40,14 @@ struct kvm_vcpu : public mobo::vcpu {
 
 
   // GPR
-  void read_regs(regs &) override;
-  void write_regs(regs &) override;
+  void read_regs(regs_t &) override;
+  void write_regs(regs_t &) override;
   // SPR
-  void read_sregs(sregs &) override;
-  void write_sregs(sregs &) override;
+  void read_sregs(regs_special_t &) override;
+  void write_regs_special(regs_special_t &) override;
   // FPR
-  void read_fregs(fpu_regs &) override;
-  void write_fregs(fpu_regs &) override;
+  void read_fregs(regs_fpu_t &) override;
+  void write_fregs(regs_fpu_t &) override;
 
   // void dump_state(FILE *, char *mem = nullptr) override;
 

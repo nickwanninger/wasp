@@ -9,11 +9,12 @@
 
 #include "compiler_defs.h"
 #include "mobo/machine.h"
-#include "platform/windows/hyperv_vcpu.h"
+#include "platform/memory.h"
 #include "platform/windows/hyperv_vcpu.h"
 #include "platform/windows/hyperv_machine.h"
 
 using namespace mobo;
+using namespace mobo::memory;
 
 const uint32_t hyperv_machine::PAGE_SIZE = hyperv_machine::get_page_size();
 
@@ -25,10 +26,11 @@ hyperv_machine::hyperv_machine(uint32_t num_cpus)
   ensure_capability_or_throw();
 
   WHV_PARTITION_HANDLE handle = create_partition();
+  handle_ = handle;
+	
   set_num_cpus(handle, num_cpus);
   setup_partition(handle);
-
-  handle_ = handle;
+  setup_long_paging();
 
   for (uint32_t i = 0; i < num_cpus; i++) {
     hyperv_vcpu cpu(handle_, i);
@@ -104,10 +106,10 @@ void hyperv_machine::run(workload &work) {
   while (true) {
     halted = false;
 
-    mobo::regs snapshot_regs_pre = {};
+    mobo::regs_t snapshot_regs_pre = {};
     cpu_[0].read_regs(snapshot_regs_pre);
 
-    mobo::sregs snapshot_sregs_pre = {};
+    mobo::regs_special_t snapshot_sregs_pre = {};
     cpu_[0].read_sregs(snapshot_sregs_pre);
   	
     WHV_RUN_VP_EXIT_CONTEXT run = cpu_[0].run();
@@ -124,10 +126,10 @@ void hyperv_machine::run(workload &work) {
 //    }
 
 
-    mobo::regs snapshot_regs = {};
+    mobo::regs_t snapshot_regs = {};
     cpu_[0].read_regs(snapshot_regs);
 
-    mobo::sregs snapshot_sregs = {};
+    mobo::regs_special_t snapshot_sregs = {};
     cpu_[0].read_sregs(snapshot_sregs);
   	
     WHV_RUN_VP_EXIT_REASON reason = run.ExitReason;
@@ -141,7 +143,7 @@ void hyperv_machine::run(workload &work) {
 
       // 0xFF is the "hcall" io op
       if (port_num == 0xFF) {
-        mobo::regs regs = {};
+        mobo::regs_t regs = {};
         cpu_[0].read_regs(regs);
         int res = work.handle_hcall(regs, mem_size_, mem_);
 
@@ -174,7 +176,7 @@ void hyperv_machine::run(workload &work) {
 //      return;
 //    }
 
-    mobo::regs regs = {};
+    mobo::regs_t regs = {};
     cpu_[0].read_regs(regs);
 
     printf("unhandled exit: %d at rip = %p\n", run.ExitReason,
@@ -294,6 +296,81 @@ uint32_t hyperv_machine::get_page_size() noexcept
   SYSTEM_INFO info;
   GetNativeSystemInfo(&info);
   return info.dwPageSize;
+}
+
+//
+
+uint64_t hyperv_machine::setup_long_paging()
+{
+  /* Recall logical memory address field format
+
+     63             48|47        39|38       30|29      21|20      12|11          0|
+     +----------------+------------+-----------+----------+----------+-------------+
+     |     unused     | PML4 index | PDP index | PD index | PT index | page offset |
+     +----------------+------------+-----------+----------+----------+-------------+
+
+      - PML4 - page mapping table level 4
+      - PDP index - page directory pointer index (level 3 index)
+          `-> PDPTE - page directory pointer table entry (level 3 entry)
+      - PD index - page directory index (level 2)
+   */
+
+  uint64_t NUM_PAGE_TABLE_ENTRIES = 512;
+  uint64_t PTE_SIZE = sizeof(struct memory::page_entry_t);
+
+  uint64_t USN_PAGE_SIZE = 0x1000;
+  uint64_t NUM_LVL3_ENTRIES = 512;
+  uint64_t NUM_LVL4_ENTRIES = 512;
+  uint64_t PML4_SIZE = NUM_LVL4_ENTRIES * PTE_SIZE;
+  uint64_t ALL_PAGE_TABLES_SIZE =
+      NUM_LVL3_ENTRIES * PTE_SIZE
+      + PML4_SIZE;
+
+  void *pte_ptr = allocate_guest_phys_memory(
+      handle_,
+      PML4_PHYSICAL_ADDRESS,
+      ALL_PAGE_TABLES_SIZE);
+
+  auto pml4 = static_cast<memory::page_entry_t *>(pte_ptr);
+  auto pml3 = static_cast<memory::page_entry_t *>((void *)((char *) pte_ptr + PML4_SIZE));
+
+  //
+  // Build a valid user-mode PML4E
+  //
+  pml4[0] = {};
+  pml4[0].present = 1;
+  pml4[0].write = 1;
+  pml4[0].allow_user_mode = 1;
+  pml4[0].page_frame_num = ((PML4_PHYSICAL_ADDRESS / USN_PAGE_SIZE) + 1);
+
+  //
+  // Build a valid user-mode 1GB PDPTE
+  //
+  memory::page_entry_t pte_template = {
+      .present = 1,
+      .write = 1,
+      .allow_user_mode = 1,
+      .large_page = 1,
+  };
+
+  //
+  // Loop over the PDPT (PML3) minus the last 1GB
+  //
+  for (uint64_t i = 0; i < NUM_LVL3_ENTRIES; i++) {
+    //
+    // Set the PDPTE to the next valid 1GB of RAM, creating a 1:1 map
+    //
+    pml3[i] = pte_template;
+    pml3[i].page_frame_num = ((i * _1GB) / USN_PAGE_SIZE);
+  }
+
+  //
+  // We mark the last GB of RAM as off-limits
+  // This corresponds to 0x0000`007FC0000000->0x0000`007FFFFFFFFF
+  //
+  pml3[511].present = 0;
+
+  return PML4_PHYSICAL_ADDRESS;
 }
 
 static machine::ptr hyperv_allocate(void) {

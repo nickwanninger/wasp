@@ -35,14 +35,14 @@ int vcpu::read_guest(u64 gva, void *buf, size_t len) {
 }
 
 static void cpu_dump_seg_cache(FILE *out, const char *name,
-                               mobo::segment const &seg) {
+                               mobo::segment_t const &seg) {
   fprintf(out, "%-3s=%04x %016" PRIx64 " %08x %d %02x %02x  %02x\n", name,
           seg.selector, (size_t)seg.base, seg.limit, seg.present, seg.db,
           seg.dpl, seg.type);
 }
 
 void vcpu::dump_state(FILE *out, char *mem) {
-  mobo::regs regs = {};
+  mobo::regs_t regs = {};
   read_regs(regs);
 
   unsigned int eflags = regs.rflags;
@@ -67,7 +67,7 @@ void vcpu::dump_state(FILE *out, char *mem) {
           eflags & CC_Z ? 'Z' : '-', eflags & CC_A ? 'A' : '-',
           eflags & CC_P ? 'P' : '-', eflags & CC_C ? 'C' : '-');
 
-  mobo::sregs sregs = {};
+  mobo::regs_special_t sregs = {};
   read_sregs(sregs);
 
   fprintf(out, "    sel  base             limit    p db dpl type\n");
@@ -92,7 +92,7 @@ void vcpu::dump_state(FILE *out, char *mem) {
 
   fprintf(out, "EFER=%016" PRIx64 "\n", (size_t)sregs.efer);
 
-  fpu_regs fpu = {};
+  regs_fpu_t fpu = {};
   read_fregs(fpu);
 
   {

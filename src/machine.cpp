@@ -79,7 +79,7 @@ void machine::load_elf(std::string file) {
 
     // setup general purpose registers
     {
-      struct regs r;
+      struct regs_t r;
       cpu(0).read_regs(r);
       r.rdi = 0x4242424242424242L;
       r.rsi = hypertable;  // TODO: The physical address of the hypertable
@@ -92,14 +92,14 @@ void machine::load_elf(std::string file) {
 
     // setup the special registers
     {
-      sregs sr;
+      regs_special_t sr;
       cpu(0).read_sregs(sr);
 
-      auto init_seg = [](mobo::segment &seg) {
+      auto init_seg = [](mobo::segment_t &seg) {
         seg.present = 1;
         seg.base = 0;
         seg.db = 1;
-        seg.g = 1;
+        seg.granularity = 1;
         seg.selector = 0x10;
         seg.limit = 0xFFFFFFF;
         seg.type = 0x3;
@@ -119,7 +119,7 @@ void machine::load_elf(std::string file) {
       sr.cr0 &= ~(1 << 31);
       sr.cr0 |= (1 << 0);
 
-      cpu(0).write_sregs(sr);
+      cpu(0).write_regs_special(sr);
     }
   }
 }

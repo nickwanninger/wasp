@@ -14,7 +14,7 @@ class workload {
 
     workload() = default;
     virtual int handle_hcall(
-            struct mobo::regs &regs,
+            struct mobo::regs_t &regs,
             size_t ramsize,
             void *ram) = 0;
     virtual ~workload() = default;
