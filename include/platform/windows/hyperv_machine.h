@@ -1,6 +1,8 @@
 #pragma once
 
 #include <WinHvPlatformDefs.h>
+#include "mobo/machine.h"
+#include "./hyperv_vcpu.h"
 
 namespace mobo {
 
@@ -29,19 +31,19 @@ private:
       uint64_t guest_addr,
       uint64_t size,
       WHV_MAP_GPA_RANGE_FLAGS flags);
-
 public:
-  explicit hyperv_machine(uint32_t num_cpus);
 
+  explicit hyperv_machine(uint32_t num_cpus);
   void allocate_ram(size_t) override;
+
   void run(workload &) override;
   void *gpa2hpa(off_t gpa) override;
   void reset() override;
-
   uint32_t num_cpus() override;
-  mobo::vcpu &cpu(uint32_t) override;
 
-  uint64_t setup_long_paging();
+  mobo::vcpu &cpu(uint32_t) override;
+  static uint64_t setup_long_paging(WHV_PARTITION_HANDLE handle);
+
 };
 
 }

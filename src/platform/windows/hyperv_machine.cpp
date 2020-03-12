@@ -30,7 +30,7 @@ hyperv_machine::hyperv_machine(uint32_t num_cpus)
 	
   set_num_cpus(handle, num_cpus);
   setup_partition(handle);
-  setup_long_paging();
+  setup_long_paging(handle);
 
   for (uint32_t i = 0; i < num_cpus; i++) {
     hyperv_vcpu cpu(handle_, i);
@@ -300,7 +300,7 @@ uint32_t hyperv_machine::get_page_size() noexcept
 
 //
 
-uint64_t hyperv_machine::setup_long_paging()
+uint64_t hyperv_machine::setup_long_paging(WHV_PARTITION_HANDLE handle)
 {
   /* Recall logical memory address field format
 
@@ -327,9 +327,12 @@ uint64_t hyperv_machine::setup_long_paging()
       + PML4_SIZE;
 
   void *pte_ptr = allocate_guest_phys_memory(
-      handle_,
+      handle,
       PML4_PHYSICAL_ADDRESS,
       ALL_PAGE_TABLES_SIZE);
+  if (pte_ptr == nullptr) {
+    throw std::runtime_error("allocate_guest_phys_memory: failed to allocate page table in guest");
+  }
 
   auto pml4 = static_cast<memory::page_entry_t *>(pte_ptr);
   auto pml3 = static_cast<memory::page_entry_t *>((void *)((char *) pte_ptr + PML4_SIZE));

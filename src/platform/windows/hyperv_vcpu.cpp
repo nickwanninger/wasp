@@ -212,7 +212,6 @@ void hyperv_vcpu::read_sregs(mobo::regs_special_t &r) {
     dst.long_mode = src.Long;
     dst.granularity = src.Granularity;
     dst.available = src.Available;
-    dst.unusable = src.Reserved;
   };
 
   copy_segment(r.cs, values[hyperv_mapping_sreg_index::cs]);
@@ -222,6 +221,7 @@ void hyperv_vcpu::read_sregs(mobo::regs_special_t &r) {
   copy_segment(r.gs, values[hyperv_mapping_sreg_index::gs]);
   copy_segment(r.ss, values[hyperv_mapping_sreg_index::ss]);
   copy_segment(r.tr, values[hyperv_mapping_sreg_index::tr]);
+  copy_segment(r.ldt, values[hyperv_mapping_sreg_index::ldt]);
 
   WHV_X64_TABLE_REGISTER gdt = values[hyperv_mapping_sreg_index::gdt].Table;
   r.gdt.base = gdt.Base;
@@ -265,7 +265,6 @@ void hyperv_vcpu::write_regs_special(mobo::regs_special_t &r)
     dst.Long = src.long_mode;
     dst.Granularity = src.granularity;
     dst.Available = src.available;
-    dst.Reserved = src.unusable;
   };
 
   copy_segment(r.cs, values[cs]);

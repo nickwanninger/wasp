@@ -22,7 +22,7 @@ public:
   void read_regs(mobo::regs_t &) override;
   void write_regs(mobo::regs_t &) override;
   // SPR
-  void read_sregs(mobo::regs_special_t &) override;
+  void read_sregs(mobo::regs_special_t &r) override;
   void write_regs_special(mobo::regs_special_t &r) override;
   // FPR
   void read_fregs(mobo::regs_fpu_t &) override;
