@@ -131,9 +131,19 @@ enum hyperv_register_index {
 static void cpu_dump_seg_cache(FILE *out, const char *name,
                                WHV_REGISTER_VALUE const &reg) {
   WHV_X64_SEGMENT_REGISTER const &seg = reg.Segment;
-  fprintf(out, "%-3s=%04x %016" PRIx64 " %08x %d %02x %02x  %02x\n", name,
-      seg.Selector, (size_t)seg.Base, seg.Limit, seg.Present, seg.Default,
-      seg.DescriptorPrivilegeLevel, seg.SegmentType);
+  fprintf(out,        "%-3s=%04x %016" PRIx64 " %08x %d %02x   %1x   %d   %d     %d     %d    %d\n",
+          name,
+          seg.Selector,
+          (size_t) seg.Base,
+          seg.Limit,
+          seg.Present,
+          seg.SegmentType,
+          seg.DescriptorPrivilegeLevel,
+          seg.NonSystemSegment,
+          seg.Granularity,
+          seg.Default,
+          seg.Long,
+          seg.Available);
 }
 
 void dump_state(FILE *out, WHV_PARTITION_HANDLE handle, uint32_t cpu_index) {
@@ -162,7 +172,8 @@ void dump_state(FILE *out, WHV_PARTITION_HANDLE handle, uint32_t cpu_index) {
       eflags & CC_Z ? 'Z' : '-', eflags & CC_A ? 'A' : '-',
       eflags & CC_P ? 'P' : '-', eflags & CC_C ? 'C' : '-');
 
-  fprintf(out, "    sel  base             limit    p db dpl type\n");
+  fprintf(out, "                                             (C/E) (G)   (D/B) (L) (AVL)\n");
+  fprintf(out, "    sel  base             limit    p type dpl u/s 8b/4k 16/32 long avl\n");
   cpu_dump_seg_cache(out, "ES", regs[es]);
   cpu_dump_seg_cache(out, "CS", regs[cs]);
   cpu_dump_seg_cache(out, "SS", regs[ss]);
@@ -293,23 +304,41 @@ void reset_long(WHV_PARTITION_HANDLE partition_handle, uint32_t cpu_index, uint6
   r[cr4].Reg64 = CR4_PAE | CR4_OSFXSR | CR4_OSXMMEXCPT;
   r[efer].Reg64 = EFER_LME | EFER_LMA;
 
-//  r[cr0].Reg64 = 0x80050033;
-//  r[cr4].Reg64 = 0x6e8;
-//  r[efer].Reg64 = 0xd01;
-
   // Set segment registers with long mode flag
-  WHV_X64_SEGMENT_REGISTER &cs_segment = r[cs].Segment;
-//  cs_segment.Selector = 0xffff;
-  cs_segment.DescriptorPrivilegeLevel = 0;
-  cs_segment.Long = 1;
+  WHV_X64_SEGMENT_REGISTER cs_segment = {
+      .Base = 0x0,
+      .Limit = 0xffff,
+      .Selector = 0x0,
+      .SegmentType = 0x0b,
+      .NonSystemSegment = 1,
+      .DescriptorPrivilegeLevel = 0x0,
+      .Present = 1,
+      .Available = 0,
+      .Long = 1,
+      .Default = 0,
+      .Granularity = 0,
+  };
 
-  WHV_X64_SEGMENT_REGISTER &ss_segment = r[ss].Segment;
-//  ss_segment.Selector = 0xffff;
-  ss_segment.DescriptorPrivilegeLevel = 0;
+  WHV_X64_SEGMENT_REGISTER segment_reg_template = {
+      .Base = 0x0,
+      .Limit = 0xffff,
+      .Selector = 0x0,
+      .SegmentType = 0x03,
+      .NonSystemSegment = 1,
+      .DescriptorPrivilegeLevel = 0x0,
+      .Present = 1,
+      .Available = 0,
+      .Long = 0,
+      .Default = 0,
+      .Granularity = 0,
+  };
 
-  r[ds] = r[ss];
-  r[es] = r[ss];
-  r[gs] = r[ss];
+  WHV_REGISTER_VALUE segment_template = {.Segment = segment_reg_template};
+  r[cs] = {.Segment = cs_segment};
+  r[ss] = segment_template;
+  r[ds] = segment_template;
+  r[es] = segment_template;
+  r[gs] = segment_template;
 
   // Disable interrupts
   r[rflags].Reg64 = 0x002;
