@@ -59,6 +59,26 @@ uint32_t get_page_size()
   return page_size;
 }
 
+const char *get_exit_reason_str(WHV_RUN_VP_EXIT_REASON reason)
+{
+  switch (reason) {
+    case WHvRunVpExitReasonNone: return "WHvRunVpExitReasonNone";
+    case WHvRunVpExitReasonMemoryAccess: return "WHvRunVpExitReasonMemoryAccess";
+    case WHvRunVpExitReasonX64IoPortAccess: return "WHvRunVpExitReasonX64IoPortAccess";
+    case WHvRunVpExitReasonUnrecoverableException: return "WHvRunVpExitReasonUnrecoverableException";
+    case WHvRunVpExitReasonInvalidVpRegisterValue: return "WHvRunVpExitReasonInvalidVpRegisterValue";
+    case WHvRunVpExitReasonUnsupportedFeature: return "WHvRunVpExitReasonUnsupportedFeature";
+    case WHvRunVpExitReasonX64InterruptWindow: return "WHvRunVpExitReasonX64InterruptWindow";
+    case WHvRunVpExitReasonX64Halt: return "WHvRunVpExitReasonX64Halt";
+    case WHvRunVpExitReasonX64ApicEoi: return "WHvRunVpExitReasonX64ApicEoi";
+    case WHvRunVpExitReasonX64MsrAccess: return "WHvRunVpExitReasonX64MsrAccess";
+    case WHvRunVpExitReasonX64Cpuid: return "WHvRunVpExitReasonX64Cpuid";
+    case WHvRunVpExitReasonException: return "WHvRunVpExitReasonException";
+    case WHvRunVpExitReasonCanceled: return "WHvRunVpExitReasonCanceled";
+    default: return nullptr;
+  }
+}
+
 uint32_t PAGE_SIZE;
 
 constexpr uint32_t NUM_REGISTERS = 18 + 6 + 2 + 2 + 5 + 3;
@@ -530,14 +550,15 @@ int main() {
 
   get_registers(handle, 0, r);
 
-  printf("exit reason -> %d; rip = 0x%llx; rax = 0x%llx\n",
-      context.ExitReason, context.VpContext.Rip, r[rax].Reg64);
+  WHV_RUN_VP_EXIT_REASON exit_reason = context.ExitReason;
+  printf("exit reason -> %d (%s); rip = 0x%llx; rax = 0x%llx\n",
+         exit_reason, get_exit_reason_str(exit_reason), context.VpContext.Rip, r[rax].Reg64);
 
   printf("================= (2) EXIT CONTEXT =================== \n");
   dump_state(stdout, handle, 0);
   printf("===================================================== \n");
 
-  if (context.ExitReason == WHvRunVpExitReasonInvalidVpRegisterValue) {
+  if (exit_reason == WHvRunVpExitReasonInvalidVpRegisterValue) {
     fprintf(stderr, "ERROR: Failed to run v-cpu: invalid register state\n");
     exit(1);
   }
