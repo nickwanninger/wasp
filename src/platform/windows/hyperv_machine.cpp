@@ -116,7 +116,6 @@ void hyperv_machine::set_partition_property(
 }
 
 void hyperv_machine::allocate_ram(size_t size) {
-  printf("%s(size = %lld)\n", __FUNCTION__, size);
   mem_size_ = size;
   mem_ = allocate_guest_phys_memory(handle_, 0, size);
 }
@@ -165,11 +164,6 @@ void hyperv_machine::run(workload &work) {
     mobo::regs_t regs = {};
     cpu_[0].read_regs_into(regs);
 
-    printf("exit: %d (%s) at rip = 0x%llx\n",
-           reason,
-           mobo::hyperv_exit_reason_str(reason),
-           regs.rip);
-
     if (reason == WHvRunVpExitReasonX64IoPortAccess) {
       uint16_t port_num = run.IoPortAccess.PortNumber;
       if (port_num == 0xFA) {
@@ -190,7 +184,7 @@ void hyperv_machine::run(workload &work) {
         // Continue execution past the `out` instruction
         uint8_t skip = run.VpContext.InstructionLength;
         hcall_regs.rip += skip;
-        printf("%s: rip += %d\n", __FUNCTION__, skip);
+//        printf("%s: rip += %d\n", __FUNCTION__, skip);
         
         cpu_[0].write_regs(hcall_regs);
         continue;
@@ -214,6 +208,11 @@ void hyperv_machine::run(workload &work) {
 //      halted = true;
 //      return;
 //    }
+
+    printf("unhandled exit: %d (%s) at rip = 0x%llx\n",
+           reason,
+           mobo::hyperv_exit_reason_str(reason),
+           regs.rip);
 
     return;
   }
