@@ -105,7 +105,7 @@ constexpr uint32_t k_hyperv_mapping_regs_special_count = std::extent<decltype(k_
 typedef WHV_REGISTER_VALUE hyperv_reg_values_t[k_hyperv_mapping_regs_count];
 typedef WHV_REGISTER_VALUE hyperv_reg_special_values_t[k_hyperv_mapping_regs_special_count];
 
-void hyperv_vcpu::read_regs(mobo::regs_t &r)
+void hyperv_vcpu::read_regs_into(mobo::regs_t &r)
 {
   HRESULT result;
 
@@ -182,7 +182,7 @@ void hyperv_vcpu::write_regs(mobo::regs_t &r)
   }
 }
 
-void hyperv_vcpu::read_sregs(mobo::regs_special_t &r) {
+void hyperv_vcpu::read_regs_special_into(mobo::regs_special_t &r) {
   HRESULT result;
 
   hyperv_reg_special_values_t values = {};
@@ -315,11 +315,11 @@ void hyperv_vcpu::write_regs_special(mobo::regs_special_t &r)
   }
 }
 
-void hyperv_vcpu::read_fregs(mobo::regs_fpu_t &regs) {
+void hyperv_vcpu::read_regs_fpu_into(mobo::regs_fpu_t &regs) {
   // TODO
 }
 
-void hyperv_vcpu::write_fregs(mobo::regs_fpu_t &regs) {
+void hyperv_vcpu::write_regs_fpu(mobo::regs_fpu_t &regs) {
   // TODO
 }
 
@@ -394,8 +394,28 @@ void hyperv_vcpu::reset_long()
 {
   struct mobo::regs_t r = {};
   struct mobo::regs_special_t s = {};
-  read_regs(r);
-  read_sregs(s);
+  read_regs_into(r);
+  read_regs_special_into(s);
+
+  r.rax = 0;
+  r.rbx = 0;
+  r.rcx = 0;
+  r.rdx = 0;
+  r.rsi = 0;
+  r.rdi = 0;
+  r.rbp = 0;
+  r.rbp = 0;
+  r.rsp = 0;
+  r.r8 = 0;
+  r.r9 = 0;
+  r.r10 = 0;
+  r.r11 = 0;
+  r.r12 = 0;
+  r.r13 = 0;
+  r.r14 = 0;
+  r.r15 = 0;
+  r.rip = 0;
+  r.rflags = 0;
 
   // see https://wiki.osdev.org/CPU_Registers_x86#CR0
   uint64_t CR0_PE = 1u << 0u; // protected mode enable
@@ -403,7 +423,7 @@ void hyperv_vcpu::reset_long()
   uint64_t CR0_ET = 1u << 4u; // extension type
   uint64_t CR0_NE = 1u << 5u; // numeric error
   uint64_t CR0_WP = 1u << 16u; // write protect
-  uint64_t CR0_AM = 1u << 18u; // alighnment mask
+  uint64_t CR0_AM = 1u << 18u; // alignment mask
   uint64_t CR0_PG = 1u << 31u; // paging
 
   uint64_t CR4_PAE = 1u << 5u; // physical address extension
@@ -416,46 +436,57 @@ void hyperv_vcpu::reset_long()
   uint64_t EFER_LMA = 1u << 10u; // long mode active
 
   // Enable paging
-  s.cr3 = PML4_PHYSICAL_ADDRESS;
-  s.cr4 = CR4_PAE | CR4_OSFXSR | CR4_OSXMMEXCPT;
   s.cr0 = CR0_PE | CR0_MP | CR0_ET | CR0_NE | CR0_WP | CR0_AM | CR0_PG;
+  s.cr3 = mobo::memory::PML4_PHYSICAL_ADDRESS;
+  s.cr4 = CR4_PAE | CR4_OSFXSR | CR4_OSXMMEXCPT;
   s.efer = EFER_LME | EFER_LMA;
 
   // Set segment registers with long mode flag
-  s.cs = {
-      .base = 0,
-      .limit = 0xffffffff,
-      .selector = 1u << 3u,
-      .type = 11,
+  segment_t cs_segment = {
+      .base = 0x0,
+      .limit = 0xffff,
+      .selector = 0x0,
+      .type = 0x0b,
       .present = 1,
-      .dpl = 0,
+      .dpl = 0x0,
+      .s = 1,
       .long_mode = 1,
-      .granularity = 1,
   };
 
-  s.ds = {
-      .base = 0,
-      .limit = 0xffffffff,
-      .selector = 2u << 3u,
-      .type = 3,
+  segment_t tr_segment = {
+      .base = 0x0,
+      .limit = 0xffff,
+      .selector = 0x0,
+      .type = 0x0b,
       .present = 1,
-      .dpl = 0,
-      .long_mode = 1,
-      .granularity = 1,
+      .dpl = 0x0,
   };
 
-  // TODO: Assumes this wasn't touched during execution
-  struct segment_t segment = s.ss;
-  s.ds = segment;
-  s.es = segment;
-  s.gs = segment;
+  segment_t segment_template = {
+      .base = 0x0,
+      .limit = 0xffff,
+      .selector = 0x0,
+      .type = 0x03,
+      .present = 1,
+      .dpl = 0x0,
+      .s = 1,
+      .long_mode = 0,
+  };
+
+  s.cs = cs_segment;
+  s.tr = tr_segment;
+
+  s.ss = segment_template;
+  s.ds = segment_template;
+  s.es = segment_template;
+  s.gs = segment_template;
 
   // Disable interrupts
   r.rflags = 0x002;
 
-  // Set the actual PC and stack pointer
-  r.rip = 0x0;
-  r.rsp = 0x1000;
+  // Setup discriptor tables
+  s.gdt = {.limit = 0xffff};
+  s.idt = {.limit = 0xffff};
 
   write_regs(r);
   write_regs_special(s);

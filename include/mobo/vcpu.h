@@ -94,15 +94,15 @@ class vcpu {
   typedef std::shared_ptr<vcpu> ptr;
 
   // GPR
-  virtual void read_regs(regs_t &) = 0;
+  virtual void read_regs_into(regs_t &) = 0;
   virtual void write_regs(regs_t &) = 0;
   // SPR
-  virtual void read_sregs(regs_special_t &) = 0;
+  virtual void read_regs_special_into(regs_special_t &) = 0;
   virtual void write_regs_special(regs_special_t &) = 0;
   // FPR
-  virtual void read_fregs(regs_fpu_t &) = 0;
-  virtual void write_fregs(regs_fpu_t &) = 0;
-  virtual void dump_state(FILE *, char *mem = nullptr);
+  virtual void read_regs_fpu_into(regs_fpu_t &) = 0;
+  virtual void write_regs_fpu(regs_fpu_t &) = 0;
+  virtual void dump_state(FILE *);
 
   // translate a guest virtual address into the host address
   virtual void *translate_address(u64 gva) = 0;

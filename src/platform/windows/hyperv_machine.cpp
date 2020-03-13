@@ -18,6 +18,26 @@ using namespace mobo::memory;
 
 const uint32_t hyperv_machine::PAGE_SIZE = hyperv_machine::get_page_size();
 
+const char *mobo::hyperv_exit_reason_str(WHV_RUN_VP_EXIT_REASON reason)
+{
+  switch (reason) {
+    case WHvRunVpExitReasonNone: return "WHvRunVpExitReasonNone";
+    case WHvRunVpExitReasonMemoryAccess: return "WHvRunVpExitReasonMemoryAccess";
+    case WHvRunVpExitReasonX64IoPortAccess: return "WHvRunVpExitReasonX64IoPortAccess";
+    case WHvRunVpExitReasonUnrecoverableException: return "WHvRunVpExitReasonUnrecoverableException";
+    case WHvRunVpExitReasonInvalidVpRegisterValue: return "WHvRunVpExitReasonInvalidVpRegisterValue";
+    case WHvRunVpExitReasonUnsupportedFeature: return "WHvRunVpExitReasonUnsupportedFeature";
+    case WHvRunVpExitReasonX64InterruptWindow: return "WHvRunVpExitReasonX64InterruptWindow";
+    case WHvRunVpExitReasonX64Halt: return "WHvRunVpExitReasonX64Halt";
+    case WHvRunVpExitReasonX64ApicEoi: return "WHvRunVpExitReasonX64ApicEoi";
+    case WHvRunVpExitReasonX64MsrAccess: return "WHvRunVpExitReasonX64MsrAccess";
+    case WHvRunVpExitReasonX64Cpuid: return "WHvRunVpExitReasonX64Cpuid";
+    case WHvRunVpExitReasonException: return "WHvRunVpExitReasonException";
+    case WHvRunVpExitReasonCanceled: return "WHvRunVpExitReasonCanceled";
+    default: return nullptr;
+  }
+}
+
 hyperv_machine::hyperv_machine(uint32_t num_cpus)
     : cpu_()
     , mem_(nullptr)
@@ -96,6 +116,7 @@ void hyperv_machine::set_partition_property(
 }
 
 void hyperv_machine::allocate_ram(size_t size) {
+  printf("%s(size = %lld)\n", __FUNCTION__, size);
   mem_size_ = size;
   mem_ = allocate_guest_phys_memory(handle_, 0, size);
 }
@@ -106,12 +127,16 @@ void hyperv_machine::run(workload &work) {
   while (true) {
     halted = false;
 
-    mobo::regs_t snapshot_regs_pre = {};
-    cpu_[0].read_regs(snapshot_regs_pre);
+//    mobo::regs_t snapshot_regs_pre = {};
+//    cpu_[0].read_regs_into(snapshot_regs_pre);
+//
+//    mobo::regs_special_t snapshot_sregs_pre = {};
+//    cpu_[0].read_regs_special_into(snapshot_sregs_pre);
 
-    mobo::regs_special_t snapshot_sregs_pre = {};
-    cpu_[0].read_sregs(snapshot_sregs_pre);
-  	
+//    printf("================= (1) PRE-EXECUTE =================== \n");
+//    cpu_[0].dump_state(stdout);
+//    printf("===================================================== \n");
+
     WHV_RUN_VP_EXIT_CONTEXT run = cpu_[0].run();
 
 //    if (stat == KVM_EXIT_SHUTDOWN) {
@@ -125,14 +150,25 @@ void hyperv_machine::run(workload &work) {
 //      return;
 //    }
 
+//    mobo::regs_t snapshot_regs = {};
+//    cpu_[0].read_regs_into(snapshot_regs);
+//
+//    mobo::regs_special_t snapshot_sregs = {};
+//    cpu_[0].read_regs_special_into(snapshot_sregs);
 
-    mobo::regs_t snapshot_regs = {};
-    cpu_[0].read_regs(snapshot_regs);
+//    printf("================= (2) POST-EXECUTE =================== \n");
+//    cpu_[0].dump_state(stdout);
+//    printf("===================================================== \n");
 
-    mobo::regs_special_t snapshot_sregs = {};
-    cpu_[0].read_sregs(snapshot_sregs);
-  	
     WHV_RUN_VP_EXIT_REASON reason = run.ExitReason;
+
+    mobo::regs_t regs = {};
+    cpu_[0].read_regs_into(regs);
+
+    printf("exit: %d (%s) at rip = 0x%llx\n",
+           reason,
+           mobo::hyperv_exit_reason_str(reason),
+           regs.rip);
 
     if (reason == WHvRunVpExitReasonX64IoPortAccess) {
       uint16_t port_num = run.IoPortAccess.PortNumber;
@@ -143,17 +179,20 @@ void hyperv_machine::run(workload &work) {
 
       // 0xFF is the "hcall" io op
       if (port_num == 0xFF) {
-        mobo::regs_t regs = {};
-        cpu_[0].read_regs(regs);
-        int res = work.handle_hcall(regs, mem_size_, mem_);
+        mobo::regs_t hcall_regs = {};
+        cpu_[0].read_regs_into(hcall_regs);
+        int res = work.handle_hcall(hcall_regs, mem_size_, mem_);
 
-        if (res != WORKLOAD_RES_OKAY) {
-          if (res == WORKLOAD_RES_KILL) {
-            return;
-          }
+        if (res == WORKLOAD_RES_KILL) {
+          return;
         }
 
-        cpu_[0].write_regs(regs);
+        // Continue execution past the `out` instruction
+        uint8_t skip = run.VpContext.InstructionLength;
+        hcall_regs.rip += skip;
+        printf("%s: rip += %d\n", __FUNCTION__, skip);
+        
+        cpu_[0].write_regs(hcall_regs);
         continue;
       }
 
@@ -176,11 +215,6 @@ void hyperv_machine::run(workload &work) {
 //      return;
 //    }
 
-    mobo::regs_t regs = {};
-    cpu_[0].read_regs(regs);
-
-    printf("unhandled exit: %d at rip = %p\n", run.ExitReason,
-           (void *)regs.rip);
     return;
   }
 }
@@ -222,12 +256,13 @@ hyperv_machine::allocate_guest_phys_memory(
   }
 
   // Map it into the partition
+  // TODO: Configure protection flags from function
   map_guest_physical_addr_range(
       handle,
       host_virtual_addr,
       guest_addr,
       size,
-      WHvMapGpaRangeFlagRead | WHvMapGpaRangeFlagWrite);
+      WHvMapGpaRangeFlagRead | WHvMapGpaRangeFlagWrite | WHvMapGpaRangeFlagExecute);
 
   return host_virtual_addr;
 }
@@ -304,22 +339,21 @@ uint64_t hyperv_machine::setup_long_paging(WHV_PARTITION_HANDLE handle)
 {
   /* Recall logical memory address field format
 
-     63             48|47        39|38       30|29      21|20      12|11          0|
-     +----------------+------------+-----------+----------+----------+-------------+
-     |     unused     | PML4 index | PDP index | PD index | PT index | page offset |
-     +----------------+------------+-----------+----------+----------+-------------+
+      63             48|47        39|38       30|29      21|20      12|11          0|
+      +----------------+------------+-----------+----------+----------+-------------+
+      |     unused     | PML4 index | PDP index | PD index | PT index | page offset |
+      +----------------+------------+-----------+----------+----------+-------------+
 
-      - PML4 - page mapping table level 4
-      - PDP index - page directory pointer index (level 3 index)
-          `-> PDPTE - page directory pointer table entry (level 3 entry)
-      - PD index - page directory index (level 2)
-   */
+       - PML4 - page mapping table level 4
+       - PDP index - page directory pointer index (level 3 index)
+           `-> PDPTE - page directory pointer table entry (level 3 entry)
+       - PD index - page directory index (level 2)
+    */
 
-  uint64_t NUM_PAGE_TABLE_ENTRIES = 512;
-  uint64_t PTE_SIZE = sizeof(struct memory::page_entry_t);
+  uint64_t PTE_SIZE = sizeof(struct mobo::memory::page_entry_t);
 
   uint64_t USN_PAGE_SIZE = 0x1000;
-  uint64_t NUM_LVL3_ENTRIES = 512;
+  uint64_t NUM_LVL3_ENTRIES = 1;
   uint64_t NUM_LVL4_ENTRIES = 512;
   uint64_t PML4_SIZE = NUM_LVL4_ENTRIES * PTE_SIZE;
   uint64_t ALL_PAGE_TABLES_SIZE =
@@ -328,14 +362,14 @@ uint64_t hyperv_machine::setup_long_paging(WHV_PARTITION_HANDLE handle)
 
   void *pte_ptr = allocate_guest_phys_memory(
       handle,
-      PML4_PHYSICAL_ADDRESS,
+      mobo::memory::PML4_PHYSICAL_ADDRESS,
       ALL_PAGE_TABLES_SIZE);
   if (pte_ptr == nullptr) {
     throw std::runtime_error("allocate_guest_phys_memory: failed to allocate page table in guest");
   }
 
-  auto pml4 = static_cast<memory::page_entry_t *>(pte_ptr);
-  auto pml3 = static_cast<memory::page_entry_t *>((void *)((char *) pte_ptr + PML4_SIZE));
+  auto pml4 = static_cast<mobo::memory::page_entry_t *>(pte_ptr);
+  auto pml3 = static_cast<mobo::memory::page_entry_t *>((void *)((char *) pte_ptr + PML4_SIZE));
 
   //
   // Build a valid user-mode PML4E
@@ -344,12 +378,12 @@ uint64_t hyperv_machine::setup_long_paging(WHV_PARTITION_HANDLE handle)
   pml4[0].present = 1;
   pml4[0].write = 1;
   pml4[0].allow_user_mode = 1;
-  pml4[0].page_frame_num = ((PML4_PHYSICAL_ADDRESS / USN_PAGE_SIZE) + 1);
+  pml4[0].page_frame_num = (mobo::memory::PML4_PHYSICAL_ADDRESS / USN_PAGE_SIZE) + 1;
 
   //
   // Build a valid user-mode 1GB PDPTE
   //
-  memory::page_entry_t pte_template = {
+  mobo::memory::page_entry_t pte_template = {
       .present = 1,
       .write = 1,
       .allow_user_mode = 1,
@@ -359,21 +393,16 @@ uint64_t hyperv_machine::setup_long_paging(WHV_PARTITION_HANDLE handle)
   //
   // Loop over the PDPT (PML3) minus the last 1GB
   //
-  for (uint64_t i = 0; i < NUM_LVL3_ENTRIES; i++) {
+  uint64_t actual_pml3 = max(1, NUM_LVL3_ENTRIES - 1);
+  for (uint64_t i = 0; i < actual_pml3; i++) {
     //
     // Set the PDPTE to the next valid 1GB of RAM, creating a 1:1 map
     //
     pml3[i] = pte_template;
-    pml3[i].page_frame_num = ((i * _1GB) / USN_PAGE_SIZE);
+    pml3[i].page_frame_num = ((i * mobo::memory::_1GB) / USN_PAGE_SIZE);
   }
 
-  //
-  // We mark the last GB of RAM as off-limits
-  // This corresponds to 0x0000`007FC0000000->0x0000`007FFFFFFFFF
-  //
-  pml3[511].present = 0;
-
-  return PML4_PHYSICAL_ADDRESS;
+  return mobo::memory::PML4_PHYSICAL_ADDRESS;
 }
 
 static machine::ptr hyperv_allocate(void) {

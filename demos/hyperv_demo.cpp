@@ -59,25 +59,6 @@ uint32_t get_page_size()
   return page_size;
 }
 
-const char *get_exit_reason_str(WHV_RUN_VP_EXIT_REASON reason)
-{
-  switch (reason) {
-    case WHvRunVpExitReasonNone: return "WHvRunVpExitReasonNone";
-    case WHvRunVpExitReasonMemoryAccess: return "WHvRunVpExitReasonMemoryAccess";
-    case WHvRunVpExitReasonX64IoPortAccess: return "WHvRunVpExitReasonX64IoPortAccess";
-    case WHvRunVpExitReasonUnrecoverableException: return "WHvRunVpExitReasonUnrecoverableException";
-    case WHvRunVpExitReasonInvalidVpRegisterValue: return "WHvRunVpExitReasonInvalidVpRegisterValue";
-    case WHvRunVpExitReasonUnsupportedFeature: return "WHvRunVpExitReasonUnsupportedFeature";
-    case WHvRunVpExitReasonX64InterruptWindow: return "WHvRunVpExitReasonX64InterruptWindow";
-    case WHvRunVpExitReasonX64Halt: return "WHvRunVpExitReasonX64Halt";
-    case WHvRunVpExitReasonX64ApicEoi: return "WHvRunVpExitReasonX64ApicEoi";
-    case WHvRunVpExitReasonX64MsrAccess: return "WHvRunVpExitReasonX64MsrAccess";
-    case WHvRunVpExitReasonX64Cpuid: return "WHvRunVpExitReasonX64Cpuid";
-    case WHvRunVpExitReasonException: return "WHvRunVpExitReasonException";
-    case WHvRunVpExitReasonCanceled: return "WHvRunVpExitReasonCanceled";
-    default: return nullptr;
-  }
-}
 
 uint32_t PAGE_SIZE;
 
@@ -280,6 +261,26 @@ void reset_long(WHV_PARTITION_HANDLE partition_handle, uint32_t cpu_index, uint6
   WHV_REGISTER_VALUE r[NUM_REGISTERS] = {};
   get_registers(partition_handle, cpu_index, r);
 
+  r[rax].Reg64 = 0;
+  r[rbx].Reg64 = 0;
+  r[rcx].Reg64 = 0;
+  r[rdx].Reg64 = 0;
+  r[rsi].Reg64 = 0;
+  r[rdi].Reg64 = 0;
+  r[rbp].Reg64 = 0;
+  r[rbp].Reg64 = 0;
+  r[rsp].Reg64 = 0;
+  r[r8].Reg64 = 0;
+  r[r9].Reg64 = 0;
+  r[r10].Reg64 = 0;
+  r[r11].Reg64 = 0;
+  r[r12].Reg64 = 0;
+  r[r13].Reg64 = 0;
+  r[r14].Reg64 = 0;
+  r[r15].Reg64 = 0;
+  r[rip].Reg64 = 0;
+  r[rflags].Reg64 = 0;
+
   // see https://wiki.osdev.org/CPU_Registers_x86#CR0
   uint64_t CR0_PE = 1u << 0u; // protected mode enable
   uint64_t CR0_MP = 1u << 1u; // monitor co-processor
@@ -313,10 +314,16 @@ void reset_long(WHV_PARTITION_HANDLE partition_handle, uint32_t cpu_index, uint6
       .NonSystemSegment = 1,
       .DescriptorPrivilegeLevel = 0x0,
       .Present = 1,
-      .Available = 0,
       .Long = 1,
-      .Default = 0,
-      .Granularity = 0,
+  };
+
+  WHV_X64_SEGMENT_REGISTER tr_segment = {
+      .Base = 0x0,
+      .Limit = 0xffff,
+      .Selector = 0x0,
+      .SegmentType = 0x0b,
+      .DescriptorPrivilegeLevel = 0x0,
+      .Present = 1,
   };
 
   WHV_X64_SEGMENT_REGISTER segment_reg_template = {
@@ -327,14 +334,13 @@ void reset_long(WHV_PARTITION_HANDLE partition_handle, uint32_t cpu_index, uint6
       .NonSystemSegment = 1,
       .DescriptorPrivilegeLevel = 0x0,
       .Present = 1,
-      .Available = 0,
       .Long = 0,
-      .Default = 0,
-      .Granularity = 0,
   };
 
-  WHV_REGISTER_VALUE segment_template = {.Segment = segment_reg_template};
   r[cs] = {.Segment = cs_segment};
+  r[tr] = {.Segment = tr_segment};
+
+  WHV_REGISTER_VALUE segment_template = {.Segment = segment_reg_template};
   r[ss] = segment_template;
   r[ds] = segment_template;
   r[es] = segment_template;
@@ -343,13 +349,16 @@ void reset_long(WHV_PARTITION_HANDLE partition_handle, uint32_t cpu_index, uint6
   // Disable interrupts
   r[rflags].Reg64 = 0x002;
 
+  // Setup discriptor tables
+  r[gdtr].Table = {.Limit = 0xffff};
+  r[idtr].Table = {.Limit = 0xffff};
+
   // Set the actual PC and stack pointer
   r[rip].Reg64 = 0x0;
   r[rsp].Reg64 = 0x1000;
 
   set_registers(partition_handle, cpu_index, r);
 }
-
 
 uint64_t setup_long_paging(WHV_PARTITION_HANDLE handle)
 {
@@ -369,7 +378,7 @@ uint64_t setup_long_paging(WHV_PARTITION_HANDLE handle)
   uint64_t PTE_SIZE = sizeof(struct mobo::memory::page_entry_t);
 
   uint64_t USN_PAGE_SIZE = 0x1000;
-  uint64_t NUM_LVL3_ENTRIES = 512;
+  uint64_t NUM_LVL3_ENTRIES = 1;
   uint64_t NUM_LVL4_ENTRIES = 512;
   uint64_t PML4_SIZE = NUM_LVL4_ENTRIES * PTE_SIZE;
   uint64_t ALL_PAGE_TABLES_SIZE =
@@ -409,19 +418,14 @@ uint64_t setup_long_paging(WHV_PARTITION_HANDLE handle)
   //
   // Loop over the PDPT (PML3) minus the last 1GB
   //
-  for (uint64_t i = 0; i < NUM_LVL3_ENTRIES - 1; i++) {
+  uint64_t actual_pml3 = max(1, NUM_LVL3_ENTRIES - 1);
+  for (uint64_t i = 0; i < actual_pml3; i++) {
     //
     // Set the PDPTE to the next valid 1GB of RAM, creating a 1:1 map
     //
     pml3[i] = pte_template;
     pml3[i].page_frame_num = ((i * mobo::memory::_1GB) / USN_PAGE_SIZE);
   }
-
-  //
-  // We mark the last GB of RAM as off-limits
-  // This corresponds to 0x0000`007FC0000000->0x0000`007FFFFFFFFF
-  //
-  pml3[511].present = 0;
 
   return mobo::memory::PML4_PHYSICAL_ADDRESS;
 }
@@ -581,7 +585,7 @@ int main() {
 
   WHV_RUN_VP_EXIT_REASON exit_reason = context.ExitReason;
   printf("exit reason -> %d (%s); rip = 0x%llx; rax = 0x%llx\n",
-         exit_reason, get_exit_reason_str(exit_reason), context.VpContext.Rip, r[rax].Reg64);
+         exit_reason, mobo::hyperv_exit_reason_str(exit_reason), context.VpContext.Rip, r[rax].Reg64);
 
   printf("================= (2) EXIT CONTEXT =================== \n");
   dump_state(stdout, handle, 0);

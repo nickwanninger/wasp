@@ -6,6 +6,8 @@
 
 namespace mobo {
 
+const char *hyperv_exit_reason_str(WHV_RUN_VP_EXIT_REASON reason);
+
 class hyperv_machine : public mobo::machine {
 
 private:

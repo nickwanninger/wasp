@@ -36,17 +36,29 @@ int vcpu::read_guest(u64 gva, void *buf, size_t len) {
 
 static void cpu_dump_seg_cache(FILE *out, const char *name,
                                mobo::segment_t const &seg) {
-  fprintf(out, "%-3s=%04x %016" PRIx64 " %08x %d %02x %02x  %02x\n", name,
-          seg.selector, (size_t)seg.base, seg.limit, seg.present, seg.db,
-          seg.dpl, seg.type);
+  fprintf(out,        "%-3s=%04x %016" PRIx64 " %08x %d %02x   %1x   %d   %d     %d     %d    %d\n",
+          name,
+          seg.selector,
+          (size_t) seg.base,
+          seg.limit,
+          seg.present,
+          seg.type,
+          seg.dpl,
+          seg.s,
+          seg.granularity,
+          seg.db,
+          seg.long_mode,
+          seg.available);
 }
 
-void vcpu::dump_state(FILE *out, char *mem) {
+void vcpu::dump_state(FILE *out) {
   mobo::regs_t regs = {};
-  read_regs(regs);
+  mobo::regs_special_t s = {};
+  read_regs_into(regs);
+  read_regs_special_into(s);
 
   unsigned int eflags = regs.rflags;
-#define GET(name) *(uint64_t *)(((char *)&regs) + offsetof(struct regs, name))
+#define GET(name) (regs.name)
 
 #define REGFMT "%016" PRIx64
   fprintf(out,
@@ -60,41 +72,44 @@ void vcpu::dump_state(FILE *out, char *mem) {
           "\n"
           "RIP=" REGFMT " RFL=%08x [%c%c%c%c%c%c%c]\n",
 
-          GET(rax), GET(rbx), GET(rcx), GET(rdx), GET(rsi), GET(rdi), GET(rbp),
-          GET(rsp), GET(r8), GET(r9), GET(r10), GET(r11), GET(r12), GET(r13),
-          GET(r14), GET(r15), GET(rip), eflags, eflags & DF_MASK ? 'D' : '-',
+          GET(rax), GET(rbx), GET(rcx), GET(rdx),
+          GET(rsi), GET(rdi), GET(rbp), GET(rsp),
+          GET(r8), GET(r9), GET(r10), GET(r11),
+          GET(r12), GET(r13), GET(r14), GET(r15),
+          GET(rip), eflags,
+          eflags & DF_MASK ? 'D' : '-',
           eflags & CC_O ? 'O' : '-', eflags & CC_S ? 'S' : '-',
           eflags & CC_Z ? 'Z' : '-', eflags & CC_A ? 'A' : '-',
           eflags & CC_P ? 'P' : '-', eflags & CC_C ? 'C' : '-');
 
-  mobo::regs_special_t sregs = {};
-  read_sregs(sregs);
+  fprintf(out, "                                             (C/E) (G)   (D/B) (L) (AVL)\n");
+  fprintf(out, "    sel  base             limit    p type dpl u/s 8b/4k 16/32 long avl\n");
+  cpu_dump_seg_cache(out, "ES", s.es);
+  cpu_dump_seg_cache(out, "CS", s.cs);
+  cpu_dump_seg_cache(out, "SS", s.ss);
+  cpu_dump_seg_cache(out, "DS", s.ds);
+  cpu_dump_seg_cache(out, "FS", s.fs);
+  cpu_dump_seg_cache(out, "GS", s.gs);
+  cpu_dump_seg_cache(out, "LDT", s.ldt);
+  cpu_dump_seg_cache(out, "TR", s.tr);
 
-  fprintf(out, "    sel  base             limit    p db dpl type\n");
-  cpu_dump_seg_cache(out, "ES", sregs.es);
-  cpu_dump_seg_cache(out, "CS", sregs.cs);
-  cpu_dump_seg_cache(out, "SS", sregs.ss);
-  cpu_dump_seg_cache(out, "DS", sregs.ds);
-  cpu_dump_seg_cache(out, "FS", sregs.fs);
-  cpu_dump_seg_cache(out, "GS", sregs.gs);
-  cpu_dump_seg_cache(out, "LDT", sregs.ldt);
-  cpu_dump_seg_cache(out, "TR", sregs.tr);
+  mobo::dtable_t &gdt_register = s.gdt;
+  fprintf(out, "GDT=     %016" PRIx64 " %08x\n", (size_t)gdt_register.base,
+          (int) gdt_register.limit);
 
-  fprintf(out, "GDT=     %016" PRIx64 " %08x\n", (size_t)sregs.gdt.base,
-          (int)sregs.gdt.limit);
-  fprintf(out, "IDT=     %016" PRIx64 " %08x\n", (size_t)sregs.idt.base,
-          (int)sregs.idt.limit);
+  mobo::dtable_t &idt_register = s.idt;
+  fprintf(out, "IDT=     %016" PRIx64 " %08x\n", (size_t)idt_register.base,
+          (int) idt_register.limit);
 
   fprintf(out,
           "CR0=%016" PRIx64 " CR2=%016" PRIx64 " CR3=%016" PRIx64 " CR4=%08x\n",
-          (size_t)sregs.cr0, (size_t)sregs.cr2, (size_t)sregs.cr3,
-          (int)sregs.cr4);
+          (size_t)s.cr0, (size_t)s.cr2, (size_t)s.cr3,
+          (int)s.cr4);
 
-  fprintf(out, "EFER=%016" PRIx64 "\n", (size_t)sregs.efer);
+  fprintf(out, "EFER=%016" PRIx64 "\n", (size_t)s.efer);
 
   regs_fpu_t fpu = {};
-  read_fregs(fpu);
-
+  read_regs_fpu_into(fpu);
   {
     int written = 0;
     for (int i = 0; i < 16; i++) {

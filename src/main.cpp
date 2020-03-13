@@ -10,6 +10,7 @@
 #include <mutex>
 #include <queue>
 #include <thread>
+#include <utility>
 
 #include "compiler_defs.h"
 #include "mobo/workload.h"
@@ -54,13 +55,13 @@ class elf_loader : public binary_loader {
     }
 
     struct regs_t r;
-    vm.cpu(0).read_regs(r);
+    vm.cpu(0).read_regs_into(r);
     r.rip = entry;
     vm.cpu(0).write_regs(r);
 
     // XXX: should we do this?
     struct regs_special_t sr;
-    vm.cpu(0).read_sregs(sr);
+    vm.cpu(0).read_regs_special_into(sr);
     sr.cs.base = 0;
     sr.ds.base = 0;
     vm.cpu(0).write_regs_special(sr);
@@ -73,31 +74,30 @@ class flatbin_loader : public binary_loader {
   std::string path;
 
  public:
-  flatbin_loader(std::string path) : path(path) {}
+  explicit flatbin_loader(std::string path) : path(std::move(path)) {}
 
-  virtual bool inject(mobo::machine &vm) override {
-    auto entry = 0x1000;
+  bool inject(mobo::machine &vm) override {
+    auto entry = 0x0000;
 
     void *addr = vm.gpa2hpa(entry);
-  	if (addr == nullptr)
-  	{
-        throw std::runtime_error("failed to convert GPA -> HPA, got nullptr");
+  	if (addr == nullptr) {
+  	  PANIC("failed to convert GPA -> HPA, got nullptr");
   	}
 
     FILE *fp = fopen(path.data(), "r");
-
-    if (fp == NULL) return false;
+    if (fp == nullptr) {
+      PANIC("failed to open binary\n");
+    }
 
     fseek(fp, 0L, SEEK_END);
     size_t sz = ftell(fp);
     fseek(fp, 0L, SEEK_SET);
 
     fread(addr, sz, 1, fp);
-
     fclose(fp);
 
-    struct regs_t r;
-    vm.cpu(0).read_regs(r);
+    struct regs_t r = {};
+    vm.cpu(0).read_regs_into(r);
     r.rip = entry;
     r.rsp = 0x1000;
     r.rbp = 0x1000;
@@ -435,16 +435,20 @@ class double_workload : public workload {
   int handle_hcall(struct mobo::regs_t &regs, size_t ramsize,
                    void *ram) override {
     if (regs.rax == 0) {
+      printf("%s: rax = 0\n", __FUNCTION__);
       regs.rbx = val;
       return WORKLOAD_RES_OKAY;
     }
 
     if (regs.rax == 1) {
+      printf("%s: rax = 1\n", __FUNCTION__);
       if (regs.rbx != val * 2) {
         throw std::runtime_error("double test failed\n");
       }
       return WORKLOAD_RES_OKAY;
     }
+
+    printf("%s: rax = %lld (kill)\n", __FUNCTION__, regs.rax);
     return WORKLOAD_RES_KILL;
   }
 };
@@ -506,14 +510,14 @@ class boottime_workload : public workload {
 
 template <class W, class L>
 bool run_test(std::string path, int run_count = 1,
-              const char *stdout_path = NULL) {
+              const char *stdout_path = nullptr) {
   printf("test [%s]\n", path.data());
 
   L loader(path);
 
   int ofd = -1;
 
-  if (stdout_path != NULL) {
+  if (stdout_path != nullptr) {
     ofd = dup(1);
     int new_fd = open(stdout_path, O_RDWR | O_CREAT | O_TRUNC, 0666);
     dup2(new_fd, 1);
@@ -522,7 +526,7 @@ bool run_test(std::string path, int run_count = 1,
 
   auto start = std::chrono::high_resolution_clock::now();
 
-  auto vm = create_machine(path, 1 * 1024l * 1024l);
+  machine::ptr vm = create_machine(path, 1 * 1024l * 1024l);
   for (int i = 0; i < run_count; i++) {
     W work;
     vm->reset();
@@ -548,12 +552,13 @@ int main(int argc, char **argv) {
   run_test<double_workload, flatbin_loader>("build/tests/double64.bin");
   // run_test<double_workload, elf_loader>("build/tests/double.elf");
 
+  exit(0);
+
   run_test<fib_workload, flatbin_loader>("build/tests/fib20.bin");
   // run_test<fib_workload, elf_loader>("build/tests/fib20.elf");
 
   run_test<boottime_workload, flatbin_loader>("build/tests/boottime.bin", 1000,
                                               "data/boottime.csv");
-  exit(0);
 
   if (argc <= 1) {
     fprintf(stderr, "usage: mobo [kernel.elf]\n");

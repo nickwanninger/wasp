@@ -19,14 +19,14 @@ public:
       uint32_t cpu_index);
 
   // GPR
-  void read_regs(mobo::regs_t &) override;
+  void read_regs_into(mobo::regs_t &r) override;
   void write_regs(mobo::regs_t &) override;
   // SPR
-  void read_sregs(mobo::regs_special_t &r) override;
+  void read_regs_special_into(mobo::regs_special_t &r) override;
   void write_regs_special(mobo::regs_special_t &r) override;
   // FPR
-  void read_fregs(mobo::regs_fpu_t &) override;
-  void write_fregs(mobo::regs_fpu_t &) override;
+  void read_regs_fpu_into(mobo::regs_fpu_t &) override;
+  void write_regs_fpu(mobo::regs_fpu_t &) override;
 
   void *translate_address(u64 gva) override;
   void reset() override;
