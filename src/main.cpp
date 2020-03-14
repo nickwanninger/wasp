@@ -253,18 +253,27 @@ void run_server() {
     }
     TIMEIT_MARK(g_main, "accept");
 
-#define CONN_DEBUG
+//#define CONN_DEBUG
 
 #ifdef CONN_DEBUG
 
-    struct hostent *hostp;
+    char hostname[NI_MAXHOST] = {};
+    int ret = getnameinfo(
+        reinterpret_cast<const SOCKADDR *>(&client_addr),
+        sizeof(struct sockaddr),
+        hostname, sizeof(hostname),
+        nullptr,
+        0,
+        0);
 
-    hostp = gethostbyaddr((const char *)&client_addr.sin_addr.s_addr,
-                          sizeof(client_addr.sin_addr.s_addr), AF_INET);
+    char host_ip[25] = {};
+    if (inet_ntop(AF_INET, &client_addr.sin_addr, host_ip, sizeof(host_ip)) != nullptr) {
+      printf("connected (%d): %s (%s)\n", nruns.load(), hostname, host_ip);
+    }
+    else {
+      printf("connected (%d): %s (unknown ip)\n", nruns.load(), hostname);
+    }
 
-     char *hostaddrp = inet_ntoa(client_addr.sin_addr);
-     printf("connected (%d): %s (%s)\n", nruns.load(), hostp->h_name,
-     hostaddrp);
 #endif
     add_sock(fd);
   }
