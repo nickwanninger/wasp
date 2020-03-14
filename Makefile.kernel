@@ -18,7 +18,7 @@ AOBJECTS:=$(ASOURCES:%.asm=%.o)
 KERNEL=build/kernel.elf
 
 
-MODE := 32
+MODE := 64
 
 AFLAGS=-w-zext-reloc
 
@@ -44,14 +44,14 @@ DFLAGS=-g -DDEBUG -O0
 
 
 
-# ifeq ($(MODE),32)
+ifeq ($(MODE),32)
 AFLAGS+=-f elf32
 CFLAGS+=-m32
 LDFLAGS+=-m elf_i386
-# else
-# AFLAGS+=-f elf64
-# CFLAGS+=-m64
-# endif
+else
+AFLAGS+=-f elf64
+CFLAGS+=-m64
+endif
 
 kern: build $(KERNEL)
 

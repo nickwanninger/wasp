@@ -1,5 +1,5 @@
 #include <io.h>
-#include "platform/socket.h"
+#include "platform/platform.h"
 #include "mobo/workload.h"
 #include "mobo/workload_impl.h"
 
@@ -7,8 +7,13 @@ namespace mobo::workload_impl {
 
 static bool send_all(int socket, void *buffer, size_t length) {
   char *ptr = (char *) buffer;
+  printf("%s(len = %lld):\n", __FUNCTION__, length);
+  for (int i = 0; i < length; i++) {
+    putchar(ptr[i]);
+  }
+
   while (length > 0) {
-    int i = write(socket, ptr, length);
+    int i = send(socket, ptr, length, 0);
     if (i < 1) return false;
     ptr += i;
     length -= i;
@@ -52,6 +57,11 @@ int tcp_workload::handle_hcall(struct mobo::regs_t &regs, size_t ramsize,
 
   fprintf(stderr, "%s: bad hypercall (%lld)\n", __FUNCTION__, regs.rax);
   return WORKLOAD_RES_KILL;
+}
+
+void tcp_workload::handle_exit() {
+  zn_socket_close(socket);
+  printf("closed socket\n");
 }
 
 }

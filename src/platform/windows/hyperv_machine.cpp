@@ -1,6 +1,5 @@
 #include <winerror.h>
 #include <WinHvPlatform.h>
-#include <processthreadsapi.h>
 #include <sysinfoapi.h>
 
 #include <stdexcept>
@@ -180,6 +179,7 @@ void hyperv_machine::run(workload &work) {
       uint16_t port_num = run.IoPortAccess.PortNumber;
       if (port_num == 0xFA) {
         // special exit call
+        work.handle_exit();
         return;
       }
 

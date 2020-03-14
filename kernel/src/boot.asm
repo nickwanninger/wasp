@@ -82,69 +82,75 @@ gdtr:
 
 section .boot
 
-;; real mode entrypoint
-;; TODO: just boot into real mode
-[bits 16]
+;; entrypoint
+[bits 64]
 global _start
 _start:
+jmp start64
 
-jmp start32
+;;[bits 32]
+;;
+;;start32:
+;;	;; load up the boot stack
+;;	mov esp, boot_stack_end
+;;
+;;	;; move the info that grub passes into the kenrel into
+;;	;; arguments that we will use when calling kmain later
+;;	mov edi, ebx
+;;	mov esi, eax
+;;
+;;	;; BASELINE
+;;	call record_timestamp
+;;
+;;  ; enable PAE and PSE
+;;  mov eax, cr4
+;;  or eax, (CR4_PAE + CR4_PSE)
+;;  mov cr4, eax
+;;
+;;	;; PAE + PSE
+;;	call record_timestamp
+;;
+;;	call kmain
+;;
+;;	; enable long mode and the NX bit
+;;  mov ecx, MSR_EFER
+;;  rdmsr
+;;  or eax, (EFER_LM + EFER_NX)
+;;  wrmsr
+;;
+;;	;; load the page directory into cr3
+;;  mov eax, page_directory
+;;  mov cr3, eax
+;;
+;;  ; enable paging
+;;  mov eax, cr0
+;;  or eax, CR0_PAGING
+;;  mov cr0, eax
+;;
+;;
+;;  ; leave compatibility mode and enter long mode
+;;  lgdt [gdtr]
+;;
+;;  mov ax, 0x10
+;;  mov ss, ax
+;;  mov ax, 0x0
+;;  mov ds, ax
+;;  mov es, ax
+;;  mov fs, ax
+;;  mov gs, ax
+;;
+;;.spn:
+;;	jmp .spn
 
-[bits 32]
 
-
-
-
-start32:
+[bits 64]
+start64:
 	;; load up the boot stack
 	mov esp, boot_stack_end
-
-	;; move the info that grub passes into the kenrel into
-	;; arguments that we will use when calling kmain later
-	mov edi, ebx
-	mov esi, eax
 
 	;; BASELINE
 	call record_timestamp
 
-  ; enable PAE and PSE
-  mov eax, cr4
-  or eax, (CR4_PAE + CR4_PSE)
-  mov cr4, eax
-
-	;; PAE + PSE
-	call record_timestamp
-
-	call kmain
-
-	; enable long mode and the NX bit
-  mov ecx, MSR_EFER
-  rdmsr
-  or eax, (EFER_LM + EFER_NX)
-  wrmsr
-
-	;; load the page directory into cr3
-  mov eax, page_directory
-  mov cr3, eax
-
-  ; enable paging
-  mov eax, cr0
-  or eax, CR0_PAGING
-  mov cr0, eax
-
-
-  ; leave compatibility mode and enter long mode
-  lgdt [gdtr]
-
-  mov ax, 0x10
-  mov ss, ax
-  mov ax, 0x0
-  mov ds, ax
-  mov es, ax
-  mov fs, ax
-  mov gs, ax
-
-
-
-.spn:
-	jmp .spn
+    ;; jump into kernel
+    call kmain
+    hlt

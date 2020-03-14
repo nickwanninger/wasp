@@ -22,3 +22,24 @@ void zn_socket_init()
     throw std::runtime_error("WSAStartup: failed to find WinSocket >= version 2.2");
   }
 }
+
+
+int zn_socket_close(zn_socket_t socket)
+{
+  // see also https://docs.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-shutdown
+
+  int result;
+  result = shutdown(socket, SD_SEND);
+  if (result == FD_CLOSE) {
+    int read;
+    char buf[4096];
+    while ((read = recv(socket, buf, 4096, MSG_WAITALL)) != 0) {
+      if (read < 0) {
+        fprintf(stderr, "%s: warning: failed to gracefully close socket\n");
+        break;
+      }
+    }
+  }
+
+  return closesocket(socket);
+}

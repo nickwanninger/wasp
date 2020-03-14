@@ -198,7 +198,7 @@ void runner_2(mobo::machine::ptr vmp, int id) {
     // run the vm
     vm.run(conn);
 
-    zn_close_socket(socket);
+    zn_socket_close(socket);
 
     nruns++;
 

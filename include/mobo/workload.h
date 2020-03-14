@@ -19,6 +19,7 @@ class workload {
             struct mobo::regs_t &regs,
             size_t ramsize,
             void *ram) = 0;
+    virtual void handle_exit() {};
     virtual ~workload() = default;
 };
 

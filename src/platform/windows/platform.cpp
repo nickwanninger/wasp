@@ -33,8 +33,3 @@ void zn_sleep_micros(uint32_t usecs)
 {
   std::this_thread::sleep_for(std::chrono::microseconds(usecs));
 }
-
-int zn_close_socket(zn_socket_t socket)
-{
-  return closesocket(socket);
-}

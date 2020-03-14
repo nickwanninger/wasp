@@ -8,14 +8,14 @@ out 0xFF, 0
 global print
 print:
 
-  push ebp
-  mov ebp, esp
+  push rbp
+  mov rbp, rsp
 
 	mov edi, DWORD [ebp+8]
 	out 0xFF, eax
 
 	add eax, edx
-  pop ebp
+  pop rbp
 	ret
 
 
@@ -26,21 +26,23 @@ exit:
 
 global write
 write:
-  push ebp
-  mov ebp, esp
+  push rbp
+  mov rbp, rsp
 
 	;; store callee-saved
-	push esi
-	push edi
-	push edx
+	push rsi
+	push rdi
+	push rdx
 
 	;; all the arguments are on the stack (-m32)
 	;; fd
-	mov edi, DWORD [ebp + 8]
+	;mov edi, DWORD [ebp + 8]
 	;; buf
-	mov esi, DWORD [ebp + 12]
+	;mov esi, DWORD [ebp + 12]
 	;; len
-	mov edx, DWORD [ebp + 16]
+	;mov edx, DWORD [ebp + 16]
+
+    ;; in x64, all arguments are already in appropriate registers
 
 	;; `hypercall' for write()
 	mov eax, 1
@@ -48,57 +50,63 @@ write:
 
 
 	;; load callee-saved
-	pop edx
-	pop edi
-	pop esi
+	pop rdx
+	pop rdi
+	pop rsi
 
-  pop ebp
+  pop rbp
 	ret
 
 
 global send
 send:
-  push ebp
-  mov ebp, esp
+  push rbp
+  mov rbp, rsp
 
 	;; store callee-saved
-	push esi
-	push edi
+	push rsi
+	push rdi
 
-	mov edi, DWORD [ebp + 8]
-	mov esi, DWORD [ebp + 12]
+    ; variables will already be in correct spot in x64
+    ; rdi -> void *data (u64)
+    ; esi -> int len (i32)
+	;mov edi, DWORD [ebp + 8]
+	;mov esi, DWORD [ebp + 12]
 
 	mov eax, 2
 	out 0xFF, eax
 
 	;; load callee-saved
-	pop edi
-	pop esi
+	pop rdi
+	pop rsi
 
-  pop ebp
+  pop rbp
 	ret
 
 
 global recv
 recv:
-  push ebp
-  mov ebp, esp
+  push rbp
+  mov rbp, rsp
 
 	;; store callee-saved
-	push esi
-	push edi
+	push rsi
+	push rdi
 
-	mov edi, DWORD [ebp + 8]
-	mov esi, DWORD [ebp + 12]
+    ; variables will already be in correct spot in x64
+    ; rdi -> void *data (u64)
+    ; esi -> int len (i32)
+	;mov edi, DWORD [ebp + 8]
+	;mov esi, DWORD [ebp + 12]
 
 	mov eax, 3
 	out 0xFF, eax
 
 	;; load callee-saved
-	pop edi
-	pop esi
+	pop rdi
+	pop rsi
 
-  pop ebp
+  pop rbp
 	ret
 
 
