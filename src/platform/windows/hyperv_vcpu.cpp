@@ -356,42 +356,45 @@ WHV_RUN_VP_EXIT_CONTEXT hyperv_vcpu::run() {
 
 void hyperv_vcpu::reset_protected()
 {
-  struct mobo::regs_t r = {0};
-  struct mobo::regs_special_t s = {0};
+  {
+    regs_t r = {};
+    read_regs_into(r);
+    r.rflags &= ~(1 << 17);
+    r.rflags &= ~(1 << 9);
+    write_regs(r);
+  }
 
-  struct mobo::segment_t clone = {
-      .limit = 0xffff,
-      .type = 0x03,
-      .present = 1,
-  };
+  // setup the special registers
+  {
+    regs_special_t sr = {};
+    read_regs_special_into(sr);
 
-  s.cs = {
-      .limit = 0xffff,
-      .selector = 0x1000,
-      .type = 0x0b,
-      .present = 1,
-  };
+    auto init_seg = [](mobo::segment_t &seg) {
+      seg.present = 1;
+      seg.base = 0;
+      seg.db = 1;
+      seg.granularity = 1;
+      seg.selector = 0x10;
+      seg.limit = 0xFFFFFFF;
+      seg.type = 0x3;
+    };
 
-  s.tr = {
-      .limit = 0xffff,
-      .type = 0x0b,
-      .present = 1,
-  };
+    init_seg(sr.cs);
+    sr.cs.selector = 0x08;
+    sr.cs.type = 0x0a;
+    sr.cs.s = 1;
+    init_seg(sr.ds);
+    init_seg(sr.es);
+    init_seg(sr.fs);
+    init_seg(sr.gs);
+    init_seg(sr.ss);
 
-  s.ldt = {0};
-  s.es = clone;
-  s.ss = clone;
-  s.ds = clone;
-  s.es = clone;
-  s.fs = clone;
-  s.gdt.limit = 0xffff;
-  s.idt.limit = 0xffff;
+    // clear bit 31, set bit 0
+    sr.cr0 &= ~(1 << 31);
+    sr.cr0 |= (1 << 0);
 
-  r.rflags = 0x2;
-  s.cr0 = 0x60000010;
-
-  write_regs(r);
-  write_regs_special(s);
+    write_regs_special(sr);
+  }
 }
 
 void hyperv_vcpu::reset_long()

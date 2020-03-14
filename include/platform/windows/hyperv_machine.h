@@ -51,10 +51,9 @@ public:
   void *gpa2hpa(off_t gpa) override;
   void reset() override;
   uint32_t num_cpus() override;
-
   mobo::vcpu &cpu(uint32_t) override;
-  uint64_t setup_long_paging(WHV_PARTITION_HANDLE handle);
 
+  uint64_t setup_long_paging(WHV_PARTITION_HANDLE handle);
 };
 
 }

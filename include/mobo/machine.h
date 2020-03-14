@@ -46,10 +46,12 @@ static_assert(sizeof(struct page_entry_t) == sizeof(uint64_t), "expected 64-bit 
 class driver;
 
 class machine {
- public:
+  uint64_t entry_ = (uint64_t) -1;
+
+public:
   typedef std::shared_ptr<machine> ptr;
 
-  explicit machine(void) {};
+  machine() = default;
   virtual ~machine();
   void load_elf(std::string file);
 
@@ -66,6 +68,8 @@ class machine {
 
   virtual uint32_t num_cpus() = 0;
   virtual mobo::vcpu &cpu(uint32_t) = 0;
+  inline uint64_t entry() { return entry_; }
+  inline void set_entry(uint64_t entry) { entry_ = entry; }
 };
 
 

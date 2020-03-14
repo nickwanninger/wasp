@@ -7,10 +7,10 @@ namespace mobo::workload_impl {
 
 static bool send_all(int socket, void *buffer, size_t length) {
   char *ptr = (char *) buffer;
-  printf("%s(len = %lld):\n", __FUNCTION__, length);
-  for (int i = 0; i < length; i++) {
-    putchar(ptr[i]);
-  }
+//  printf("%s(len = %lld):\n", __FUNCTION__, length);
+//  for (int i = 0; i < length; i++) {
+//    putchar(ptr[i]);
+//  }
 
   while (length > 0) {
     int i = send(socket, ptr, length, 0);
@@ -61,7 +61,6 @@ int tcp_workload::handle_hcall(struct mobo::regs_t &regs, size_t ramsize,
 
 void tcp_workload::handle_exit() {
   zn_socket_close(socket);
-  printf("closed socket\n");
 }
 
 }

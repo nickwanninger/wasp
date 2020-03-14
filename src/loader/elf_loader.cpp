@@ -11,6 +11,7 @@ elf_loader::elf_loader(std::string path) { reader.load(path); }
 bool elf_loader::inject(mobo::machine &vm) {
   printf("%s\n", __FUNCTION__);
   auto entry = reader.get_entry();
+  vm.set_entry(entry);
 
   uint16_t num_sections = reader.sections.size();
   for (int i = 0; i < num_sections; i++) {

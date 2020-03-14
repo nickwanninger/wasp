@@ -170,10 +170,10 @@ void hyperv_machine::run(workload &work) {
     mobo::regs_t regs = {};
     cpu_[0].read_regs_into(regs);
 
-    printf("exit: %d (%s) at rip = 0x%llx\n",
-           reason,
-           mobo::hyperv_exit_reason_str(reason),
-           regs.rip);
+//    printf("exit: %d (%s) at rip = 0x%llx\n",
+//           reason,
+//           mobo::hyperv_exit_reason_str(reason),
+//           regs.rip);
 
     if (reason == WHvRunVpExitReasonX64IoPortAccess) {
       uint16_t port_num = run.IoPortAccess.PortNumber;
@@ -242,6 +242,11 @@ void *hyperv_machine::gpa2hpa(off_t gpa) {
 void hyperv_machine::reset() {
   for (hyperv_vcpu &vcpu : cpu_) {
     vcpu.reset();
+
+    regs_t r = {};
+    vcpu.read_regs_into(r);
+    r.rip = entry();
+    vcpu.write_regs(r);
   }
 }
 
