@@ -1,8 +1,4 @@
-#include <inttypes.h>
 #include <mobo/machine.h>
-#include <stdio.h>
-//#include <sys/mman.h>
-#include <mobo/memwriter.h>
 #include <mobo/types.h>
 #include <mobo/vcpu.h>
 

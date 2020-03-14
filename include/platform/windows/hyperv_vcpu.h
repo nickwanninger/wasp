@@ -18,6 +18,8 @@ public:
       WHV_PARTITION_HANDLE partition_handle,
       uint32_t cpu_index);
 
+  ~hyperv_vcpu();
+
   // GPR
   void read_regs_into(mobo::regs_t &r) override;
   void write_regs(mobo::regs_t &) override;

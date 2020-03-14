@@ -1,4 +1,3 @@
-#include <atomic>
 #include <io.h>
 #include "platform/socket.h"
 #include "mobo/workload.h"

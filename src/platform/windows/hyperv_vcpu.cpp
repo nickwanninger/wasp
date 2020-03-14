@@ -21,6 +21,10 @@ hyperv_vcpu::hyperv_vcpu(
   }
 }
 
+hyperv_vcpu::~hyperv_vcpu() {
+  WHvDeleteVirtualProcessor(partition_handle_, cpu_index_);
+}
+
 const WHV_REGISTER_NAME k_hyperv_mapping_regnames[] = {
     WHvX64RegisterRax,
     WHvX64RegisterRbx,

@@ -53,9 +53,16 @@ hyperv_machine::hyperv_machine(uint32_t num_cpus)
   setup_long_paging(handle);
 
   for (uint32_t i = 0; i < num_cpus; i++) {
-    hyperv_vcpu cpu(handle_, i);
-    cpu_.push_back(cpu);
+    cpu_.emplace_back(handle_, i);
   }
+}
+
+hyperv_machine::~hyperv_machine() {
+  for (auto alloc : virtual_allocs_) {
+    free_virtual_memory(alloc.addr, alloc.size, MEM_DECOMMIT);
+  }
+  cpu_.clear(); // run v-cpu destructors first
+  WHvDeletePartition(handle_);
 }
 
 void hyperv_machine::ensure_capability_or_throw()
@@ -282,6 +289,7 @@ hyperv_machine::allocate_virtual_memory(
     throw std::runtime_error("failed to allocate virtual memory of size " + std::to_string(size) + " bytes: VirtualAlloc");
   }
 
+  virtual_allocs_.emplace_back(addr, size);
   return addr;
 }
 
@@ -319,7 +327,7 @@ mobo::vcpu &hyperv_machine::cpu(uint32_t index) {
 
 void hyperv_machine::free_virtual_memory(void *address, size_t size, DWORD free_type)
 {
-  BOOL result = VirtualFreeEx(GetCurrentProcess(), address, size, free_type);
+  BOOL result = VirtualFree(address, size, free_type);
   if (result == 0) {
     throw std::runtime_error("failed to free virtual memory");
   }
@@ -404,7 +412,7 @@ uint64_t hyperv_machine::setup_long_paging(WHV_PARTITION_HANDLE handle)
   return mobo::memory::PML4_PHYSICAL_ADDRESS;
 }
 
-static machine::ptr hyperv_allocate(void) {
+static machine::ptr hyperv_allocate() {
   return std::make_shared<hyperv_machine>(1);
 }
 

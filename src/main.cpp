@@ -329,11 +329,12 @@ bool run_test(std::string path, int run_count = 1,
 
 int main(int argc, char **argv) {
   run_test<double_workload, loader::flatbin_loader>("build/tests/double64.bin");
-  run_test<double_workload, loader::flatbin_loader>("build/tests/double64.bin");
-
-  exit(0);
+  run_test<double_workload, loader::elf_loader>("build/tests/double64.elf");
+	
   run_test<fib_workload, loader::flatbin_loader>("build/tests/fib20.bin");
-  // run_test<fib_workload, elf_loader>("build/tests/fib20.elf");
+  run_test<fib_workload, loader::elf_loader>("build/tests/fib20.elf");
+	
+  exit(0);
 
   run_test<boottime_workload, loader::flatbin_loader>("build/tests/boottime.bin", 1000,
                                               "data/boottime.csv");
