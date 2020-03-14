@@ -294,7 +294,7 @@ void hyperv_machine::map_guest_physical_addr_range(
 {
   // IMPORTANT: Fails if `size` is not page aligned
   if (size % PAGE_SIZE != 0) {
-    throw std::runtime_error("size must be page aligned to " + std::to_string(PAGE_SIZE) + " bytes");
+    PANIC("%s", ("size must be page aligned to " + std::to_string(PAGE_SIZE) + " bytes").data());
   }
 
   HRESULT hr = WHvMapGpaRange(
@@ -305,7 +305,7 @@ void hyperv_machine::map_guest_physical_addr_range(
       flags);
 
   if (FAILED(hr)) {
-    throw std::runtime_error("failed to map guest physical address range: WHvMapGpaRange");
+    PANIC("WHvMapGpaRange: failed to map guest physical address range");
   }
 }
 
