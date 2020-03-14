@@ -139,9 +139,9 @@ void hyperv_machine::run(workload &work) {
 //    mobo::regs_special_t snapshot_sregs_pre = {};
 //    cpu_[0].read_regs_special_into(snapshot_sregs_pre);
 
-    printf("================= (1) PRE-EXECUTE =================== \n");
-    cpu_[0].dump_state(stdout);
-    printf("===================================================== \n");
+//    printf("================= (1) PRE-EXECUTE =================== \n");
+//    cpu_[0].dump_state(stdout);
+//    printf("===================================================== \n");
 
     WHV_RUN_VP_EXIT_CONTEXT run = cpu_[0].run();
 
@@ -203,6 +203,7 @@ void hyperv_machine::run(workload &work) {
       }
 
       fprintf(stderr, "%s: unhandled io port 0x%x\n", __FUNCTION__, port_num);
+      cpu_[0].dump_state(stderr);
       return;
     }
 
