@@ -32,7 +32,7 @@ int tcp_workload::handle_hcall(struct mobo::regs_t &regs, size_t ramsize,
 
     char *buf = (char *) ram + buf_off;
     regs.rax = send_all(socket, buf, len);
-    return 0;
+    return WORKLOAD_RES_OKAY;
   }
 
   // recv
@@ -47,8 +47,11 @@ int tcp_workload::handle_hcall(struct mobo::regs_t &regs, size_t ramsize,
 
     char *buf = (char *) ram + buf_off;
     regs.rax = recv(socket, buf, len, 0);
+    return WORKLOAD_RES_OKAY;
   }
-  return WORKLOAD_RES_OKAY;
+
+  fprintf(stderr, "%s: bad hypercall (%lld)\n", __FUNCTION__, regs.rax);
+  return WORKLOAD_RES_KILL;
 }
 
 }

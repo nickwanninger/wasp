@@ -133,15 +133,15 @@ void hyperv_machine::run(workload &work) {
   while (true) {
     halted = false;
 
-//    mobo::regs_t snapshot_regs_pre = {};
-//    cpu_[0].read_regs_into(snapshot_regs_pre);
+    mobo::regs_t snapshot_regs_pre = {};
+    cpu_[0].read_regs_into(snapshot_regs_pre);
 //
 //    mobo::regs_special_t snapshot_sregs_pre = {};
 //    cpu_[0].read_regs_special_into(snapshot_sregs_pre);
 
-//    printf("================= (1) PRE-EXECUTE =================== \n");
-//    cpu_[0].dump_state(stdout);
-//    printf("===================================================== \n");
+    printf("================= (1) PRE-EXECUTE =================== \n");
+    cpu_[0].dump_state(stdout);
+    printf("===================================================== \n");
 
     WHV_RUN_VP_EXIT_CONTEXT run = cpu_[0].run();
 
@@ -171,6 +171,11 @@ void hyperv_machine::run(workload &work) {
     mobo::regs_t regs = {};
     cpu_[0].read_regs_into(regs);
 
+    printf("exit: %d (%s) at rip = 0x%llx\n",
+           reason,
+           mobo::hyperv_exit_reason_str(reason),
+           regs.rip);
+
     if (reason == WHvRunVpExitReasonX64IoPortAccess) {
       uint16_t port_num = run.IoPortAccess.PortNumber;
       if (port_num == 0xFA) {
@@ -197,7 +202,8 @@ void hyperv_machine::run(workload &work) {
         continue;
       }
 
-      continue;
+      fprintf(stderr, "%s: unhandled io port 0x%x\n", __FUNCTION__, port_num);
+      return;
     }
 
 //    if (stat == KVM_EXIT_INTERNAL_ERROR) {
@@ -215,12 +221,12 @@ void hyperv_machine::run(workload &work) {
 //      halted = true;
 //      return;
 //    }
-
-    printf("unhandled exit: %d (%s) at rip = 0x%llx\n",
+    printf("unhandled exit! %d (%s) at rip = 0x%llx\n",
            reason,
            mobo::hyperv_exit_reason_str(reason),
            regs.rip);
 
+    cpu_[0].dump_state(stdout);
     return;
   }
 }

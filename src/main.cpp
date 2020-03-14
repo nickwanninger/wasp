@@ -5,8 +5,6 @@
 #include <condition_variable>
 #include <cstdint>
 #include <cstring>
-#include <elfio/elfio.hpp>
-#include <iostream>
 #include <mutex>
 #include <queue>
 #include <thread>
@@ -40,8 +38,9 @@ static void add_dirty(mobo::machine::ptr v) {
   dirty_signal.notify_one();
 }
 
-machine::ptr create_machine(const std::string &path, size_t memsize);
+machine::ptr create_machine(size_t memsize);
 
+template <class L>
 static std::shared_ptr<mobo::machine> get_clean(std::string &path,
                                                 size_t memsize) {
   {
@@ -52,12 +51,15 @@ static std::shared_ptr<mobo::machine> get_clean(std::string &path,
       return v;
     }
   }
-  // allocate a new one
-  machine::ptr v = create_machine(path, memsize);
+
+  L loader(path);
+  machine::ptr v = create_machine(memsize);
+  loader.inject(*v);
+
   return v;
 }
 
-machine::ptr create_machine(const std::string &path, size_t memsize) {
+machine::ptr create_machine(size_t memsize) {
   machine::ptr v = platform::create(PLATFORM_ANY);
   v->allocate_ram(memsize);
   v->reset();
@@ -207,7 +209,7 @@ void runner_2(mobo::machine::ptr vmp, int id) {
 #pragma clang diagnostic pop
 
 #define MAX 80
-#define PORT 8080
+#define PORT 9090
 #define BACKLOG 1000 /* how many pending connections queue will hold */
 
 void run_server() {
@@ -259,9 +261,9 @@ void run_server() {
     hostp = gethostbyaddr((const char *)&client_addr.sin_addr.s_addr,
                           sizeof(client_addr.sin_addr.s_addr), AF_INET);
 
-    // char *hostaddrp = inet_ntoa(client_addr.sin_addr);
-    // printf("connected (%d): %s (%s)\n", nruns.load(), hostp->h_name,
-    // hostaddrp);
+     char *hostaddrp = inet_ntoa(client_addr.sin_addr);
+     printf("connected (%d): %s (%s)\n", nruns.load(), hostp->h_name,
+     hostaddrp);
 #endif
     add_sock(fd);
   }
@@ -274,7 +276,7 @@ int test_throughput_2(std::string path, int nrunners) {
   std::vector<std::thread> runners;
 
   for (int i = 0; i < nrunners; i++) {
-    runners.emplace_back(runner_2, get_clean(path, ramsize), i % nprocs);
+    runners.emplace_back(runner_2, get_clean<loader::elf_loader>(path, ramsize), i % nprocs);
     fprintf(stderr, "created machine #%d\n", i);
   }
 
@@ -305,7 +307,9 @@ bool run_test(std::string path, int run_count = 1,
 
   auto start = std::chrono::high_resolution_clock::now();
 
-  machine::ptr vm = create_machine(path, 1 * 1024l * 1024l);
+  // TODO: Use the RAM size from what you're loading or throw if the loader
+  // requested memory size is greater than the limit
+  machine::ptr vm = create_machine(path, 5 * 1024l * 1024l);
   for (int i = 0; i < run_count; i++) {
     W work;
     vm->reset();
@@ -328,21 +332,21 @@ bool run_test(std::string path, int run_count = 1,
 }
 
 int main(int argc, char **argv) {
-  run_test<double_workload, loader::flatbin_loader>("build/tests/double64.bin");
-  run_test<double_workload, loader::elf_loader>("build/tests/double64.elf");
+//  run_test<double_workload, loader::flatbin_loader>("build/tests/double64.bin");
+//  run_test<double_workload, loader::elf_loader>("build/tests/double64.elf");
+//
+//  run_test<fib_workload, loader::flatbin_loader>("build/tests/fib20.bin");
+//  run_test<fib_workload, loader::elf_loader>("build/tests/fib20.elf");
 	
-  run_test<fib_workload, loader::flatbin_loader>("build/tests/fib20.bin");
-  run_test<fib_workload, loader::elf_loader>("build/tests/fib20.elf");
-	
-  exit(0);
+//  exit(0);
 
-  run_test<boottime_workload, loader::flatbin_loader>("build/tests/boottime.bin", 1000,
-                                              "data/boottime.csv");
+//  run_test<boottime_workload, loader::flatbin_loader>("build/tests/boottime.bin", 1000,
+//                                              "data/boottime.csv");
 
-  if (argc <= 1) {
-    fprintf(stderr, "usage: mobo [kernel.elf]\n");
-    return -1;
-  }
+//  if (argc <= 1) {
+//    fprintf(stderr, "usage: mobo [kernel.elf]\n");
+//    return -1;
+//  }
 
   int nprocs = zn_get_processors_count();
 
@@ -361,7 +365,8 @@ int main(int argc, char **argv) {
   // signal(SIGPIPE, SIG_IGN);
 
   nprocs = 1;
-  test_throughput_2(argv[optind], nprocs);
+//  test_throughput_2(argv[optind], nprocs);
+  test_throughput_2("./build/kernel.elf", nprocs);
   //  auto machine = create_machine(argv[optind], 1);
   printf("success!");
   getchar();
