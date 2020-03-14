@@ -1,0 +1,70 @@
+#pragma once
+
+#include <chrono>
+#include <cstdio>
+
+#define TIMEIT_EXTERN(STREAM) \
+  extern std::chrono::high_resolution_clock::time_point __timeit_start_##STREAM; \
+  extern std::chrono::high_resolution_clock::time_point __timeit_last_##STREAM
+
+
+#define TIMEIT_START(STEAM) \
+  auto __timeit_start_##STEAM = std::chrono::high_resolution_clock::now(); \
+  auto __timeit_last_##STEAM = __timeit_start_##STEAM
+
+
+#define __TIMEIT_PRINT(STREAM, MSG, MSG_SUFFIX, START_TIME, DELTA) \
+  do { \
+    auto end = std::chrono::high_resolution_clock::now(); \
+    typedef std::chrono::microseconds micros; \
+    auto dur = std::chrono::duration_cast<micros>(end - __timeit_start_##STREAM); \
+    auto dur_micros = dur.count(); \
+    auto delta = std::chrono::duration_cast<micros>(end - START_TIME); \
+    auto delta_micros = delta.count(); \
+    __timeit_last_##STREAM = end; \
+    printf("[%.4f] %s %s ", dur.count() / 1000.0, MSG, MSG_SUFFIX); \
+    if (DELTA && delta_micros < 1000) { \
+      printf("(+%lld us)", delta_micros); \
+    } \
+    else if (DELTA) { \
+      printf("(+%.2f ms)", delta_micros / 1000.0); \
+    } \
+    printf("\n"); \
+  } while (0)
+
+
+#define TIMEIT_MARK(STREAM, NAME) __TIMEIT_PRINT(STREAM, NAME, "", __timeit_start_##STREAM, false)
+
+#define TIMEIT_GUARD_NAME(STREAM, NAME) __timeit_guard_##STREAM##_##NAME
+#define TIMEIT_GUARD_NAME_T(STREAM, NAME) __timeit_guard_##STREAM##_##NAME##_t
+#define TIMEIT_GUARD_VAR(STREAM, NAME, MSG) TIMEIT_GUARD_NAME_T(STREAM, NAME) TIMEIT_GUARD_NAME(STREAM, NAME)##(MSG)
+
+#define TIMEIT_GUARD_EXIT(MODE, STREAM, NAME) TIMEIT_GUARD_EXIT_##MODE##(STREAM, NAME)
+#define TIMEIT_GUARD_EXIT_dtor(NUM, NAME) ~##TIMEIT_GUARD_NAME_T(NUM, NAME)##()
+#define TIMEIT_GUARD_EXIT_exit(NUM, NAME) void exit()
+
+#define TIMEIT_GUARD(STREAM, NAME, MODE) \
+  struct TIMEIT_GUARD_NAME_T(STREAM, NAME) { \
+    const char *msg; \
+    std::chrono::high_resolution_clock::time_point start; \
+    explicit TIMEIT_GUARD_NAME_T(STREAM, NAME)##(const char *msg)\
+      : start(std::chrono::high_resolution_clock::now()) \
+      , msg(msg) \
+    { \
+      __TIMEIT_PRINT(STREAM, msg, "begin", start, false); \
+    } \
+    TIMEIT_GUARD_EXIT(MODE, STREAM, NAME) { __TIMEIT_PRINT(STREAM, msg, "end", start, true); } \
+  }
+
+#define TIMEIT_RECORD(STREAM, NAME) TIMEIT_GUARD(STREAM, NAME, exit)
+
+#define TIMEIT_BEGIN(STREAM, NAME, MSG) \
+  TIMEIT_RECORD(STREAM, NAME); \
+  TIMEIT_GUARD_VAR(STREAM, NAME, MSG)
+
+#define TIMEIT_END(NUM, NAME) \
+  TIMEIT_GUARD_NAME(NUM, NAME)##.exit()
+
+#define TIMEIT_FN(STREAM) \
+  TIMEIT_GUARD(STREAM, fn, dtor); \
+  TIMEIT_GUARD_VAR(STREAM, fn, __FUNCTION__)

@@ -10,6 +10,7 @@
 #include <thread>
 #include <utility>
 
+#include "timeit.h"
 #include "compiler_defs.h"
 #include "mobo/workload.h"
 #include "mobo/workload_impl.h"
@@ -21,6 +22,8 @@
 
 using namespace mobo;
 using namespace mobo::workload_impl;
+
+TIMEIT_START(g_main);
 
 std::atomic<int> nruns = 0;
 std::atomic<int> nhcalls = 0;
@@ -169,6 +172,7 @@ std::mutex data_lock;
 int run_count = 0;
 
 static void add_sock(int sock) {
+  TIMEIT_FN(g_main);
   socket_lock.lock();
   sockets.push(sock);
   socket_lock.unlock();
@@ -195,10 +199,7 @@ void runner_2(mobo::machine::ptr vmp, int id) {
     lk.unlock();
 
     tcp_workload conn(socket);
-    // run the vm
     vm.run(conn);
-
-    zn_socket_close(socket);
 
     nruns++;
 
@@ -246,11 +247,11 @@ void run_server() {
   while (true) {
     socklen_t sin_size = sizeof(struct sockaddr_in);
     int fd;
-    if ((fd = accept(server_fd, (struct sockaddr *)&client_addr, &sin_size)) ==
-        -1) {
+    if ((fd = accept(server_fd, (struct sockaddr *)&client_addr, &sin_size)) == -1) {
       throw std::runtime_error("failed to accept connection on socket");
       continue;
     }
+    TIMEIT_MARK(g_main, "accept");
 
 #define CONN_DEBUG
 

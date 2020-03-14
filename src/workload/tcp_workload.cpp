@@ -1,7 +1,11 @@
-#include <io.h>
+#include <chrono>
+
+#include "timeit.h"
 #include "platform/platform.h"
 #include "mobo/workload.h"
 #include "mobo/workload_impl.h"
+
+TIMEIT_EXTERN(g_main);
 
 namespace mobo::workload_impl {
 
@@ -25,6 +29,8 @@ tcp_workload::tcp_workload(zn_socket_t sock) : socket(sock) {}
 
 int tcp_workload::handle_hcall(struct mobo::regs_t &regs, size_t ramsize,
                                void *ram) {
+  TIMEIT_FN(g_main);
+
   // send
   if (regs.rax == 2) {
     off_t buf_off = regs.rdi;
@@ -60,6 +66,7 @@ int tcp_workload::handle_hcall(struct mobo::regs_t &regs, size_t ramsize,
 }
 
 void tcp_workload::handle_exit() {
+  TIMEIT_FN(g_main);
   zn_socket_close(socket);
 }
 

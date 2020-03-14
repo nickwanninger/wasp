@@ -1,8 +1,12 @@
 #include "compiler_defs.h"
+#include <stdexcept>
+#include <chrono>
+#include <iostream>
+
 #include <WinHvPlatform.h>
 #include <winerror.h>
 
-#include <stdexcept>
+#include "timeit.h"
 #include "platform/memory.h"
 #include "platform/windows/hyperv_vcpu.h"
 

@@ -1,16 +1,20 @@
 #include <winerror.h>
-#include <WinHvPlatform.h>
 #include <sysinfoapi.h>
+#include <memoryapi.h>
+#include <WinHvPlatform.h>
 
 #include <stdexcept>
-#include <memoryapi.h>
 #include <atomic>
+#include <chrono>
 
 #include "compiler_defs.h"
+#include "timeit.h"
 #include "mobo/machine.h"
 #include "platform/memory.h"
 #include "platform/windows/hyperv_vcpu.h"
 #include "platform/windows/hyperv_machine.h"
+
+TIMEIT_EXTERN(g_main);
 
 using namespace mobo;
 using namespace mobo::memory;
@@ -127,6 +131,7 @@ void hyperv_machine::allocate_ram(size_t size) {
 }
 
 void hyperv_machine::run(workload &work) {
+  TIMEIT_FN(g_main);
 
   bool halted = false;
   while (true) {
@@ -142,7 +147,9 @@ void hyperv_machine::run(workload &work) {
 //    cpu_[0].dump_state(stdout);
 //    printf("===================================================== \n");
 
+    TIMEIT_BEGIN(g_main, vcpu, "vcpu run");
     WHV_RUN_VP_EXIT_CONTEXT run = cpu_[0].run();
+    TIMEIT_END(g_main, vcpu);
 
 //    if (stat == KVM_EXIT_SHUTDOWN) {
 //      shutdown = true;
