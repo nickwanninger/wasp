@@ -7,6 +7,7 @@
 #include "support.h"
 #include "./socket.h"
 #include "./backend.h"
+#include "./loader.h"
 
 void
 zn_set_affinity(int cpu);

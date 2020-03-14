@@ -9,6 +9,8 @@
 // OKAY means the hcall was good and flush the regs
 #define WORKLOAD_RES_OKAY 0
 
+namespace mobo {
+
 class workload {
   public:
 
@@ -19,3 +21,5 @@ class workload {
             void *ram) = 0;
     virtual ~workload() = default;
 };
+
+}

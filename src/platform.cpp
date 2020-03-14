@@ -27,3 +27,4 @@ mobo::machine::ptr mobo::platform::create(int flags) {
 
   return nullptr;
 };
+

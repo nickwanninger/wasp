@@ -14,6 +14,7 @@
 
 #include "compiler_defs.h"
 #include "mobo/workload.h"
+#include "mobo/workload_impl.h"
 #include "platform/getopt.h"
 #include "platform/platform.h"
 #include "platform/unistd.h"
@@ -21,98 +22,7 @@
 #define RAMSIZE (16 * 1024l * 1024l)
 
 using namespace mobo;
-
-class binary_loader {
- public:
-  binary_loader() {}
-  virtual ~binary_loader() {}
-
-  virtual bool inject(mobo::machine &vm) = 0;
-};
-
-class elf_loader : public binary_loader {
-  ELFIO::elfio reader;
-
- public:
-  elf_loader(std::string path) { reader.load(path); }
-
-  virtual bool inject(mobo::machine &vm) override {
-    auto entry = reader.get_entry();
-
-    auto secc = reader.sections.size();
-    for (int i = 0; i < secc; i++) {
-      auto psec = reader.sections[i];
-      auto type = psec->get_type();
-      if (psec->get_name() == ".comment") continue;
-
-      if (type == SHT_PROGBITS) {
-        auto size = psec->get_size();
-        if (size == 0) continue;
-        const char *data = psec->get_data();
-        auto dst = (char *)vm.gpa2hpa(psec->get_address());
-        memcpy(dst, data, size);
-      }
-    }
-
-    struct regs_t r;
-    vm.cpu(0).read_regs_into(r);
-    r.rip = entry;
-    vm.cpu(0).write_regs(r);
-
-    // XXX: should we do this?
-    struct regs_special_t sr;
-    vm.cpu(0).read_regs_special_into(sr);
-    sr.cs.base = 0;
-    sr.ds.base = 0;
-    vm.cpu(0).write_regs_special(sr);
-
-    return true;
-  }
-};
-
-class flatbin_loader : public binary_loader {
-  std::string path;
-
- public:
-  explicit flatbin_loader(std::string path) : path(std::move(path)) {}
-
-  bool inject(mobo::machine &vm) override {
-    auto entry = 0x0000;
-
-    void *addr = vm.gpa2hpa(entry);
-  	if (addr == nullptr) {
-  	  PANIC("failed to convert GPA -> HPA, got nullptr");
-  	}
-
-    FILE *fp = fopen(path.data(), "r");
-    if (fp == nullptr) {
-      PANIC("failed to open binary\n");
-    }
-
-    fseek(fp, 0L, SEEK_END);
-    size_t sz = ftell(fp);
-    fseek(fp, 0L, SEEK_SET);
-
-    fread(addr, sz, 1, fp);
-    fclose(fp);
-
-    struct regs_t r = {};
-    vm.cpu(0).read_regs_into(r);
-    r.rip = entry;
-    r.rsp = 0x1000;
-    r.rbp = 0x1000;
-    vm.cpu(0).write_regs(r);
-
-    // XXX: should we do this?
-//    struct regs_special_t sr;
-//    vm.cpu(0).read_sregs(sr);
-//    sr.cs.base = 0;
-//    sr.ds.base = 0;
-//    vm.cpu(0).write_regs_special(sr);
-
-    return true;
-  }
-};
+using namespace mobo::workload_impl;
 
 std::atomic<int> nruns = 0;
 std::atomic<int> nhcalls = 0;
@@ -245,58 +155,6 @@ int test_throughput_1(std::string path, int nrunners, int ncleaners) {
 }
 */
 
-bool send_all(int socket, void *buffer, size_t length) {
-  char *ptr = (char *)buffer;
-  while (length > 0) {
-    int i = write(socket, ptr, length);
-    if (i < 1) return false;
-    ptr += i;
-    length -= i;
-  }
-  return true;
-}
-
-class tcp_workload : public workload {
- public:
-  zn_socket_t socket = {};
-
-  tcp_workload(zn_socket_t sock) : socket(sock) {}
-
-  int handle_hcall(struct mobo::regs_t &regs, size_t ramsize,
-                   void *ram) override {
-    nhcalls++;
-
-    // send
-    if (regs.rax == 2) {
-      off_t buf_off = regs.rdi;
-      size_t len = regs.rsi;
-
-      if (buf_off + len >= ramsize) {
-        regs.rax = -1;
-        return WORKLOAD_RES_OKAY;
-      }
-
-      char *buf = (char *)ram + buf_off;
-      regs.rax = send_all(socket, buf, len);
-      return 0;
-    }
-
-    // recv
-    if (regs.rax == 3) {
-      off_t buf_off = regs.rdi;
-      size_t len = regs.rsi;
-
-      if (buf_off + len >= ramsize) {
-        regs.rax = -1;
-        return WORKLOAD_RES_OKAY;
-      }
-
-      char *buf = (char *)ram + buf_off;
-      regs.rax = recv(socket, buf, len, 0);
-    }
-    return WORKLOAD_RES_OKAY;
-  }
-};
 
 std::queue<zn_socket_t> sockets;
 
@@ -429,85 +287,6 @@ int test_throughput_2(std::string path, int nrunners) {
   return -1;
 }
 
-class double_workload : public workload {
-  int val = 20;
-
-  int handle_hcall(struct mobo::regs_t &regs, size_t ramsize,
-                   void *ram) override {
-    if (regs.rax == 0) {
-//      printf("%s: rax = 0\n", __FUNCTION__);
-      regs.rbx = val;
-      return WORKLOAD_RES_OKAY;
-    }
-
-    if (regs.rax == 1) {
-//      printf("%s: rax = 1\n", __FUNCTION__);
-      if (regs.rbx != val * 2) {
-        throw std::runtime_error("double test failed\n");
-      }
-      return WORKLOAD_RES_OKAY;
-    }
-
-//    printf("%s: rax = %lld (kill)\n", __FUNCTION__, regs.rax);
-    return WORKLOAD_RES_KILL;
-  }
-};
-
-class fib_workload : public workload {
-  int handle_hcall(struct mobo::regs_t &regs, size_t ramsize,
-                   void *ram) override {
-    printf("rax=%ld\n", regs.rax);
-    return WORKLOAD_RES_KILL;
-  }
-};
-
-static int boot_runc = 0;
-
-class boottime_workload : public workload {
- public:
-  boottime_workload(void) {
-    if (boot_runc == 0) {
-      printf("Platform, cli, lgdt, prot, in 32, id map, long, in 64\n");
-    }
-    boot_runc++;
-  }
-  ~boottime_workload(void) { printf("\n"); }
-  int handle_hcall(struct mobo::regs_t &regs, size_t ramsize,
-                   void *ram) override {
-    if (regs.rax == 1) {
-      uint64_t *tsc = (uint64_t *)ram;
-
-#ifdef __linux__
-      printf("KVM Noserial, ");
-#endif
-
-#ifdef _WIN32
-      printf("Hyper-V, ");
-#endif
-
-      uint64_t baseline = tsc[0];
-      // uint64_t overhead = tsc[1] - baseline;
-
-      for (int i = 2; tsc[i] != 0; i++) {
-        auto prev = tsc[i - 1];
-        auto curr = tsc[i];
-
-        printf("%4ld", curr - prev);
-        if (tsc[i + 1] != 0) printf(",");
-      }
-      /*
-      for (int i = 2; tsc[i] != 0; i++) {
-        printf("%4ld", tsc[i] - baseline);
-        if (tsc[i + 1] != 0) printf(",");
-      }
-      */
-      return WORKLOAD_RES_KILL;
-    }
-
-    return WORKLOAD_RES_OKAY;
-  }
-};
-
 template <class W, class L>
 bool run_test(std::string path, int run_count = 1,
               const char *stdout_path = nullptr) {
@@ -549,15 +328,14 @@ bool run_test(std::string path, int run_count = 1,
 }
 
 int main(int argc, char **argv) {
-  run_test<double_workload, flatbin_loader>("build/tests/double64.bin");
-  // run_test<double_workload, elf_loader>("build/tests/double.elf");
+  run_test<double_workload, loader::flatbin_loader>("build/tests/double64.bin");
+  run_test<double_workload, loader::flatbin_loader>("build/tests/double64.bin");
 
   exit(0);
-
-  run_test<fib_workload, flatbin_loader>("build/tests/fib20.bin");
+  run_test<fib_workload, loader::flatbin_loader>("build/tests/fib20.bin");
   // run_test<fib_workload, elf_loader>("build/tests/fib20.elf");
 
-  run_test<boottime_workload, flatbin_loader>("build/tests/boottime.bin", 1000,
+  run_test<boottime_workload, loader::flatbin_loader>("build/tests/boottime.bin", 1000,
                                               "data/boottime.csv");
 
   if (argc <= 1) {
