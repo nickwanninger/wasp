@@ -319,7 +319,7 @@ bool run_test(std::string path, int run_count = 1,
 
   // TODO: Use the RAM size from what you're loading or throw if the loader
   // requested memory size is greater than the limit
-  machine::ptr vm = create_machine(path, 5 * 1024l * 1024l);
+  machine::ptr vm = create_machine(5 * 1024l * 1024l);
   for (int i = 0; i < run_count; i++) {
     W work;
     vm->reset();

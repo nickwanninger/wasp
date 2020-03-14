@@ -26,7 +26,7 @@
     auto delta_micros = delta.count(); \
     printf("[%.4f] %s %s ", dur.count() / 1000.0, MSG, MSG_SUFFIX); \
     if (DELTA && delta_micros < 1000) { \
-      printf("(+%lld us)", delta_micros); \
+      printf("(+%lu us)", delta_micros); \
     } \
     else if (DELTA) { \
       printf("(+%.2f ms)", delta_micros / 1000.0); \
@@ -39,17 +39,17 @@
 
 #define TIMEIT_GUARD_NAME(STREAM, NAME) __timeit_guard_##STREAM##_##NAME
 #define TIMEIT_GUARD_NAME_T(STREAM, NAME) __timeit_guard_##STREAM##_##NAME##_t
-#define TIMEIT_GUARD_VAR(STREAM, NAME, MSG) TIMEIT_GUARD_NAME_T(STREAM, NAME) TIMEIT_GUARD_NAME(STREAM, NAME)##(MSG)
+#define TIMEIT_GUARD_VAR(STREAM, NAME, MSG) TIMEIT_GUARD_NAME_T(STREAM, NAME) TIMEIT_GUARD_NAME(STREAM, NAME)(MSG)
 
-#define TIMEIT_GUARD_EXIT(MODE, STREAM, NAME) TIMEIT_GUARD_EXIT_##MODE##(STREAM, NAME)
-#define TIMEIT_GUARD_EXIT_dtor(NUM, NAME) ~##TIMEIT_GUARD_NAME_T(NUM, NAME)##()
+#define TIMEIT_GUARD_EXIT(MODE, STREAM, NAME) TIMEIT_GUARD_EXIT_##MODE(STREAM, NAME)
+#define TIMEIT_GUARD_EXIT_dtor(NUM, NAME) ~TIMEIT_GUARD_NAME_T(NUM, NAME)()
 #define TIMEIT_GUARD_EXIT_exit(NUM, NAME) void exit()
 
 #define TIMEIT_GUARD(STREAM, NAME, MODE) \
   struct TIMEIT_GUARD_NAME_T(STREAM, NAME) { \
     const char *msg; \
     std::chrono::high_resolution_clock::time_point start; \
-    explicit TIMEIT_GUARD_NAME_T(STREAM, NAME)##(const char *msg)\
+    explicit TIMEIT_GUARD_NAME_T(STREAM, NAME)(const char *msg)\
       : start(std::chrono::high_resolution_clock::now()) \
       , msg(msg) \
     { \

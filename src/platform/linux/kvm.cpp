@@ -177,14 +177,10 @@ void *kvm_machine::gpa2hpa(off_t gpa) {
 // #define RECORD_VMEXIT_LIFETIME
 
 void kvm_machine::run(workload &work) {
-  auto &cpufd = cpus[0].cpufd;
-  auto run = cpus[0].kvm_run;
+  int cpufd = cpus[0].cpufd;
+  struct kvm_run *run = cpus[0].kvm_run;
 
-  mobo::regs regs;
-
-  cpus[0].read_regs(regs);
-
-  while (1) {
+  while (true) {
     halted = false;
     int err = ioctl(cpufd, KVM_RUN, NULL);
 
@@ -202,7 +198,7 @@ void kvm_machine::run(workload &work) {
       shutdown = true;
       fprintf(stderr, "SHUTDOWN (probably a triple fault)\n");
 
-      cpus[0].dump_state(stderr, (char *)this->mem);
+      cpus[0].dump_state(stderr);
       return;
     }
 
@@ -222,9 +218,9 @@ void kvm_machine::run(workload &work) {
 
       // 0xFF is the "hcall" io op
       if (run->io.port == 0xFF) {
-        mobo::regs regs = {};
-        cpus[0].read_regs(regs);
-        int res = work.handle_hcall(regs, memsize, mem);
+        regs_t hcall_regs = {};
+        cpus[0].read_regs_into(hcall_regs);
+        int res = work.handle_hcall(hcall_regs, memsize, mem);
 
         if (res != WORKLOAD_RES_OKAY) {
           if (res == WORKLOAD_RES_KILL) {
@@ -232,7 +228,7 @@ void kvm_machine::run(workload &work) {
           }
         }
 
-        cpus[0].write_regs(regs);
+        cpus[0].write_regs(hcall_regs);
         continue;
       }
 
@@ -255,7 +251,8 @@ void kvm_machine::run(workload &work) {
       return;
     }
 
-    cpus[0].read_regs(regs);
+    regs_t regs = {};
+    cpus[0].read_regs_into(regs);
 
     fprintf(stderr, "unhandled exit: %d at rip = %p\n", run->exit_reason,
            (void *)regs.rip);
@@ -359,9 +356,6 @@ void kvm_machine::reset(void) {
   // printf("done cleaning\n");
 }
 
-
-
-
 uint32_t kvm_machine::num_cpus(void) {return cpus.size(); }
 mobo::vcpu &kvm_machine::cpu(uint32_t i) {return cpus[i]; }
 
@@ -371,7 +365,7 @@ void kvm_vcpu::reset(void) {
   ioctl(cpufd, KVM_SET_FPU, &initial_fpu);
 }
 
-void kvm_vcpu::read_regs(regs &r) {
+void kvm_vcpu::read_regs_into(regs_t &r) {
   struct kvm_regs regs;
   ioctl(cpufd, KVM_GET_REGS, &regs);
 
@@ -398,7 +392,7 @@ void kvm_vcpu::read_regs(regs &r) {
   r.rflags = regs.rflags;
 }
 
-void kvm_vcpu::write_regs(regs &regs) {
+void kvm_vcpu::write_regs(regs_t &regs) {
   struct kvm_regs r;
   r.rax = regs.rax;
   r.rbx = regs.rbx;
@@ -424,12 +418,12 @@ void kvm_vcpu::write_regs(regs &regs) {
   ioctl(cpufd, KVM_SET_REGS, &r);
 }
 
-void kvm_vcpu::read_sregs(sregs &r) {
+void kvm_vcpu::read_regs_special_into(regs_special_t &r) {
   struct kvm_sregs sr;
 
   ioctl(cpufd, KVM_GET_SREGS, &sr);
 
-  static auto copy_segment = [](auto &dst, auto &src) {
+  static auto copy_segment = [](segment_t &dst, auto &src) {
     dst.base = src.base;
     dst.limit = src.limit;
     dst.selector = src.selector;
@@ -438,9 +432,9 @@ void kvm_vcpu::read_sregs(sregs &r) {
     dst.dpl = src.dpl;
     dst.db = src.db;
     dst.s = src.s;
-    dst.l = src.l;
-    dst.g = src.g;
-    dst.avl = src.avl;
+    dst.long_mode = src.l;
+    dst.granularity = src.g;
+    dst.available = src.avl;
     dst.unusable = src.unusable;
     // dont need to copy padding
   };
@@ -471,10 +465,11 @@ void kvm_vcpu::read_sregs(sregs &r) {
     r.interrupt_bitmap[i] = sr.interrupt_bitmap[i];
   }
 }
-void kvm_vcpu::write_sregs(sregs &sr) {
+
+void kvm_vcpu::write_regs_special(regs_special_t &sr) {
   struct kvm_sregs r;
 
-  static auto copy_segment = [](auto &dst, auto &src) {
+  static auto copy_segment = [](auto &dst, segment_t &src) {
     dst.base = src.base;
     dst.limit = src.limit;
     dst.selector = src.selector;
@@ -483,9 +478,9 @@ void kvm_vcpu::write_sregs(sregs &sr) {
     dst.dpl = src.dpl;
     dst.db = src.db;
     dst.s = src.s;
-    dst.l = src.l;
-    dst.g = src.g;
-    dst.avl = src.avl;
+    dst.l = src.long_mode;
+    dst.g = src.granularity;
+    dst.avl = src.available;
     dst.unusable = src.unusable;
     // dont need to copy padding
   };
@@ -519,7 +514,7 @@ void kvm_vcpu::write_sregs(sregs &sr) {
   ioctl(cpufd, KVM_SET_SREGS, &sr);
 }
 
-void kvm_vcpu::read_fregs(fpu_regs &dst) {
+void kvm_vcpu::read_regs_fpu_into(regs_fpu_t &dst) {
   struct kvm_fpu src;
 
   ioctl(cpufd, KVM_GET_FPU, &src);
@@ -543,7 +538,7 @@ void kvm_vcpu::read_fregs(fpu_regs &dst) {
   }
   dst.mxcsr = dst.mxcsr;
 }
-void kvm_vcpu::write_fregs(fpu_regs &src) {
+void kvm_vcpu::write_regs_fpu(regs_fpu_t &src) {
   struct kvm_fpu dst;
 
   for (int i = 0; i < 8; i++) {

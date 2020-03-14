@@ -21,10 +21,10 @@ void zn_sleep_micros(uint32_t usecs) {
   usleep(usecs);
 }
 
-int zn_close_socket(zn_socket_t socket) {
-  return close(socket);
-}
-
 void zn_socket_init() {
   // do nothing
+}
+
+int zn_socket_close(zn_socket_t socket) {
+  return close(socket);
 }
