@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <thread>
 
 #ifdef _WIN32
 
@@ -10,7 +11,8 @@
 
 #define PANIC(msg, ...) \
     do { \
-        fprintf(stderr, "panic! [%s] %s:L%d: " msg "\n", \
+        fprintf(stderr, "panic! (tid %d) [%s] %s:L%d: " msg "\n", \
+                std::this_thread::get_id(), \
                 __FILE__,  \
                 __FUNCTION__, \
                 __LINE__, \
@@ -23,7 +25,8 @@
 
 #define PANIC(msg, vargs...) \
     do { \
-        fprintf(stderr, "panic! [%s] %s:L%d: " msg "\n", \
+        fprintf(stderr, "panic! (tid %d) %s:L%d: " msg "\n", \
+                std::this_thread::get_id(), \
                 __FILE__,  \
                 __FUNCTION__, \
                 __LINE__, \

@@ -2,18 +2,18 @@
 
 #include <chrono>
 #include <cstdio>
+#include <thread>
 
 #define TIMEIT_ENABLED 1
 
 #if TIMEIT_ENABLED
 
 #define TIMEIT_EXTERN(STREAM) \
-  extern std::chrono::high_resolution_clock::time_point __timeit_start_##STREAM; \
-  extern std::chrono::high_resolution_clock::time_point __timeit_last_##STREAM
+  extern std::chrono::high_resolution_clock::time_point __timeit_start_##STREAM
 
 
 #define TIMEIT_START(STEAM) \
-  auto __timeit_start_##STEAM = std::chrono::high_resolution_clock::now(); \
+  std::chrono::high_resolution_clock::time_point __timeit_start_##STEAM = std::chrono::high_resolution_clock::now()
 
 
 #define __TIMEIT_PRINT(STREAM, MSG, MSG_SUFFIX, START_TIME, DELTA) \
@@ -24,7 +24,8 @@
     auto dur_micros = dur.count(); \
     auto delta = std::chrono::duration_cast<micros>(end - START_TIME); \
     auto delta_micros = delta.count(); \
-    printf("[%.4f] %s %s ", dur.count() / 1000.0, MSG, MSG_SUFFIX); \
+    auto tid = std::this_thread::get_id(); \
+    printf("[%.4f tid %d] %s %s ", dur.count() / 1000.0, tid, MSG, MSG_SUFFIX); \
     if (DELTA && delta_micros < 1000) { \
       printf("(+%lu us)", delta_micros); \
     } \
@@ -65,7 +66,7 @@
   TIMEIT_GUARD_VAR(STREAM, NAME, MSG)
 
 #define TIMEIT_END(NUM, NAME) \
-  TIMEIT_GUARD_NAME(NUM, NAME)##.exit()
+  TIMEIT_GUARD_NAME(NUM, NAME).exit()
 
 #define TIMEIT_FN(STREAM) \
   TIMEIT_GUARD(STREAM, fn, dtor); \

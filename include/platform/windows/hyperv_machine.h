@@ -23,6 +23,7 @@ private:
   std::vector<virtual_alloc_t> virtual_allocs_;
 
   static const uint32_t PAGE_SIZE;
+  static const uint32_t PAGE_ALIGNMENT;
 
   static void ensure_capability_or_throw();
   static WHV_PARTITION_HANDLE create_partition();
@@ -32,6 +33,7 @@ private:
   void *allocate_guest_phys_memory(WHV_PARTITION_HANDLE handle, uint64_t guest_addr, size_t size);
   void *allocate_virtual_memory(size_t size, DWORD allocation_flags, DWORD protection_flags);
   static uint32_t get_page_size() noexcept;
+  static uint32_t get_page_alignment() noexcept;
   static void free_virtual_memory(void *address, size_t size, DWORD free_type);
   static void map_guest_physical_addr_range(
       WHV_PARTITION_HANDLE handle,

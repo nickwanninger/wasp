@@ -6,13 +6,12 @@
 #include <stdexcept>
 #include <atomic>
 #include <chrono>
-
+#include <platform/unistd.h>
 #include "compiler_defs.h"
+
 #include "timeit.h"
 #include "mobo/machine.h"
-#include "platform/memory.h"
-#include "platform/windows/hyperv_vcpu.h"
-#include "platform/windows/hyperv_machine.h"
+#include "platform/platform.h"
 
 TIMEIT_EXTERN(g_main);
 
@@ -20,6 +19,7 @@ using namespace mobo;
 using namespace mobo::memory;
 
 const uint32_t hyperv_machine::PAGE_SIZE = hyperv_machine::get_page_size();
+const uint32_t hyperv_machine::PAGE_ALIGNMENT = hyperv_machine::get_page_alignment();
 
 const char *mobo::hyperv_exit_reason_str(WHV_RUN_VP_EXIT_REASON reason)
 {
@@ -41,11 +41,16 @@ const char *mobo::hyperv_exit_reason_str(WHV_RUN_VP_EXIT_REASON reason)
   }
 }
 
+static int instance_count = 0;
+
 hyperv_machine::hyperv_machine(uint32_t num_cpus)
     : cpu_()
     , mem_(nullptr)
     , mem_size_(0)
 {
+  printf("DEBUG: page size -> %d bytes\n", PAGE_SIZE);
+  ++instance_count;
+  TIMEIT_MARK(g_main, __FUNCTION__);
   ensure_capability_or_throw();
 
   WHV_PARTITION_HANDLE handle = create_partition();
@@ -61,6 +66,7 @@ hyperv_machine::hyperv_machine(uint32_t num_cpus)
 }
 
 hyperv_machine::~hyperv_machine() {
+  TIMEIT_FN(g_main);
   for (auto alloc : virtual_allocs_) {
     free_virtual_memory(alloc.addr, alloc.size, MEM_DECOMMIT);
   }
@@ -90,6 +96,7 @@ void hyperv_machine::ensure_capability_or_throw()
 
 WHV_PARTITION_HANDLE hyperv_machine::create_partition()
 {
+  TIMEIT_FN(g_main);
   WHV_PARTITION_HANDLE handle;
   HRESULT hr = WHvCreatePartition(&handle);
   if (FAILED(hr)) {
@@ -101,9 +108,10 @@ WHV_PARTITION_HANDLE hyperv_machine::create_partition()
 
 void hyperv_machine::setup_partition(WHV_PARTITION_HANDLE handle)
 {
+  TIMEIT_FN(g_main);
   HRESULT hr = WHvSetupPartition(handle);
   if (FAILED(hr)) {
-    throw std::runtime_error("failed to create Hyper-V driver: WHvSetupPartition failed");
+    PANIC("failed to create Hyper-V driver: WHvSetupPartition failed");
   }
 }
 
@@ -263,21 +271,24 @@ hyperv_machine::allocate_guest_phys_memory(
     uint64_t guest_addr,
     size_t size)
 {
-  // IMPORTANT: Round up to the page size to prevent the call to
-  // `WHvMapGpaRange` failing
-  size_t size_over_page = size % PAGE_SIZE;
-  if (size_over_page > 0) {
-    size = size + (PAGE_SIZE - size_over_page);
+  if (guest_addr % PAGE_ALIGNMENT != 0) {
+    PANIC("guest_addr is not page aligned");
   }
 
-  // Allocate top-down as to not disturb the guest VA
+  // IMPORTANT: Round up to the page size to prevent the call to
+  // `WHvMapGpaRange` failing
+  size_t size_over_page = size % PAGE_ALIGNMENT;
+  if (size_over_page > 0) {
+    size = size + (PAGE_ALIGNMENT - size_over_page);
+  }
+
   void *host_virtual_addr = allocate_virtual_memory(
       size,
-      MEM_COMMIT | MEM_TOP_DOWN,
-      PAGE_EXECUTE_READWRITE);
+      MEM_RESERVE | MEM_COMMIT,
+      PAGE_READWRITE);
 
   if (host_virtual_addr == nullptr) {
-    throw std::runtime_error("failed to allocated virtual memory of size " + std::to_string(size) + " bytes");
+    PANIC("failed to allocated virtual memory of size %lld bytes", size);
   }
 
   // Map it into the partition
@@ -298,14 +309,23 @@ hyperv_machine::allocate_virtual_memory(
     DWORD allocation_flags,
     DWORD protection_flags)
 {
-  void *addr = VirtualAlloc(
+  MEM_ADDRESS_REQUIREMENTS addressReqs = {};
+  MEM_EXTENDED_PARAMETER param = {};
+  addressReqs.Alignment = PAGE_ALIGNMENT;
+  param.Type = MemExtendedParameterAddressRequirements;
+  param.Pointer = &addressReqs;
+
+  void *addr = VirtualAlloc2(
+      GetCurrentProcess(),
       nullptr,
       size,
       allocation_flags,
-      protection_flags);
+      protection_flags,
+      &param,
+      1);
 
   if (addr == nullptr) {
-    throw std::runtime_error("failed to allocate virtual memory of size " + std::to_string(size) + " bytes: VirtualAlloc");
+    PANIC("failed to allocate virtual memory of size %lld bytes", size);
   }
 
   virtual_allocs_.emplace_back(addr, size);
@@ -319,9 +339,13 @@ void hyperv_machine::map_guest_physical_addr_range(
     uint64_t size,
     WHV_MAP_GPA_RANGE_FLAGS flags)
 {
+  TIMEIT_FN(g_main, __FUNCTION__);
+  printf("%s(handle = 0x%p, host_addr = 0x%p, guest_addr = 0x%llx, size = %lld, flags = %d\n",
+      __FUNCTION__, handle, host_addr, guest_addr, size, flags);
+
   // IMPORTANT: Fails if `size` is not page aligned
-  if (size % PAGE_SIZE != 0) {
-    PANIC("%s", ("size must be page aligned to " + std::to_string(PAGE_SIZE) + " bytes").data());
+  if (size % PAGE_ALIGNMENT != 0) {
+    PANIC("%s", ("size must be page aligned to " + std::to_string(PAGE_ALIGNMENT) + " bytes").data());
   }
 
   HRESULT hr = WHvMapGpaRange(
@@ -359,6 +383,13 @@ uint32_t hyperv_machine::get_page_size() noexcept
   return info.dwPageSize;
 }
 
+uint32_t hyperv_machine::get_page_alignment() noexcept
+{
+  SYSTEM_INFO info;
+  GetNativeSystemInfo(&info);
+  return info.dwAllocationGranularity;
+}
+
 //
 
 uint64_t hyperv_machine::setup_long_paging(WHV_PARTITION_HANDLE handle)
@@ -376,6 +407,8 @@ uint64_t hyperv_machine::setup_long_paging(WHV_PARTITION_HANDLE handle)
        - PD index - page directory index (level 2)
     */
 
+  static uint64_t phys_addr = mobo::memory::PML4_PHYSICAL_ADDRESS;
+
   uint64_t PTE_SIZE = sizeof(struct mobo::memory::page_entry_t);
 
   uint64_t USN_PAGE_SIZE = 0x1000;
@@ -388,7 +421,7 @@ uint64_t hyperv_machine::setup_long_paging(WHV_PARTITION_HANDLE handle)
 
   void *pte_ptr = allocate_guest_phys_memory(
       handle,
-      mobo::memory::PML4_PHYSICAL_ADDRESS,
+      phys_addr,
       ALL_PAGE_TABLES_SIZE);
   if (pte_ptr == nullptr) {
     throw std::runtime_error("allocate_guest_phys_memory: failed to allocate page table in guest");
@@ -428,7 +461,7 @@ uint64_t hyperv_machine::setup_long_paging(WHV_PARTITION_HANDLE handle)
     pml3[i].page_frame_num = ((i * mobo::memory::_1GB) / USN_PAGE_SIZE);
   }
 
-  return mobo::memory::PML4_PHYSICAL_ADDRESS;
+  return phys_addr;
 }
 
 static machine::ptr hyperv_allocate() {

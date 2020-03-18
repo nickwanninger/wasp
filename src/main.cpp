@@ -30,6 +30,7 @@ std::atomic<int> nhcalls = 0;
 
 std::mutex dirty_lock;
 std::mutex clean_lock;
+std::mutex create_lock;
 std::queue<mobo::machine::ptr> clean;
 std::queue<mobo::machine::ptr> dirty;
 std::condition_variable dirty_signal;
@@ -44,8 +45,11 @@ static void add_dirty(mobo::machine::ptr v) {
 machine::ptr create_machine(size_t memsize);
 
 template <class L>
-static std::shared_ptr<mobo::machine> get_clean(std::string &path,
-                                                size_t memsize) {
+static std::shared_ptr<mobo::machine> get_clean(
+    const std::string &path, size_t memsize)
+{
+  TIMEIT_FN(g_main);
+
   {
     std::scoped_lock lck(clean_lock);
     if (!clean.empty()) {
@@ -55,11 +59,13 @@ static std::shared_ptr<mobo::machine> get_clean(std::string &path,
     }
   }
 
-  L loader(path);
-  machine::ptr v = create_machine(memsize);
-  loader.inject(*v);
-
-  return v;
+  {
+    std::scoped_lock lock(create_lock);
+    L loader(path);
+    machine::ptr v = create_machine(memsize);
+    loader.inject(*v);
+    return v;
+  }
 }
 
 machine::ptr create_machine(size_t memsize) {
@@ -181,9 +187,11 @@ static void add_sock(int sock) {
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
-void runner_2(mobo::machine::ptr vmp, int id) {
-  auto &vm = *vmp;
+void runner_2(int id, const std::string &path, size_t ramsize) {
   zn_set_affinity(id);
+  fprintf(stdout, "[tid %d] creating machine #%d\n", std::this_thread::get_id(), id);
+  auto vm = get_clean<loader::elf_loader>(path, ramsize);
+  auto vm2 = get_clean<loader::elf_loader>(path, ramsize);
 
   while (true) {
     std::unique_lock<std::mutex> lk(socket_lock);
@@ -199,12 +207,12 @@ void runner_2(mobo::machine::ptr vmp, int id) {
     lk.unlock();
 
     tcp_workload conn(socket);
-    vm.run(conn);
+    vm->run(conn);
 
     nruns++;
 
     // reset the vm
-    vm.reset();
+    vm->reset();
   }
 }
 #pragma clang diagnostic pop
@@ -279,18 +287,17 @@ void run_server() {
   }
 }
 
-int test_throughput_2(std::string path, int nrunners) {
+int test_throughput_2(const std::string& path, int nrunners) {
+  zn_set_affinity(nrunners + 1);
+
   int nprocs = zn_get_processors_count();
 
   size_t ramsize = 1 * 1024l * 1024l;
   std::vector<std::thread> runners;
 
   for (int i = 0; i < nrunners; i++) {
-    runners.emplace_back(runner_2, get_clean<loader::elf_loader>(path, ramsize), i % nprocs);
-    fprintf(stderr, "created machine #%d\n", i);
+    runners.emplace_back(runner_2, i % nprocs, path, ramsize);
   }
-
-  zn_set_affinity(nrunners + 1);
 
   // start the server
   run_server();
@@ -358,25 +365,25 @@ int main(int argc, char **argv) {
 //    return -1;
 //  }
 
-  int nprocs = zn_get_processors_count();
+  int nrunners = zn_get_processors_count();
 
   int c;
   while ((c = getopt(argc, argv, "t:")) != -1) switch (c) {
       case 't':
-        nprocs = atoi(optarg);
+        nrunners = atoi(optarg);
         break;
       default:
         printf("unexected flag '%c'\n", c);
         exit(1);
     }
 
-  printf("nprocs=%d\n", nprocs);
+  printf("nprocs=%d\n", nrunners);
   // lele
   // signal(SIGPIPE, SIG_IGN);
 
-  nprocs = 1;
+  nrunners = 1;
 //  test_throughput_2(argv[optind], nprocs);
-  test_throughput_2("./build/kernel.elf", nprocs);
+  test_throughput_2("./build/kernel.elf", nrunners);
   //  auto machine = create_machine(argv[optind], 1);
   printf("success!");
   getchar();

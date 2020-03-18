@@ -60,6 +60,7 @@ if (WIN32)
             PRIVATE
             winhvplatform.lib  # Hyper-V
             ws2_32.lib  # WinSock 2
+            mincore.lib  # support `VirtualAlloc2`
             )
 
 elseif(LINUX)

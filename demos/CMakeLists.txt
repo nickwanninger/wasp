@@ -22,6 +22,7 @@ if (MSVC)
     target_link_libraries(hyperv_demo
             PRIVATE
             winhvplatform.lib  # Hyper-V
+            mincore.lib # VirtualAlloc2()
             )
 
     target_include_directories(hyperv_demo
