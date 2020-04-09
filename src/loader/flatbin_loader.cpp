@@ -8,7 +8,7 @@ namespace mobo::loader {
 flatbin_loader::flatbin_loader(std::string path) : path(std::move(path)) {}
 
 bool flatbin_loader::inject(mobo::machine &vm) {
-  auto entry = 0x0000;
+  auto entry = 0x1000;
   vm.set_entry(entry);
 
   void *addr = vm.gpa2hpa(entry);

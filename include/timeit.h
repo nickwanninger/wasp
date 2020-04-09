@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <thread>
 
-#define TIMEIT_ENABLED 1
+#define TIMEIT_ENABLED 0
 
 #if TIMEIT_ENABLED
 

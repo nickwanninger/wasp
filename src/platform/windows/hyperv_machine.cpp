@@ -58,7 +58,7 @@ hyperv_machine::hyperv_machine(uint32_t num_cpus)
 	
   set_num_cpus(handle, num_cpus);
   setup_partition(handle);
-  setup_long_paging(handle);
+  // setup_long_paging(handle);
 
   for (uint32_t i = 0; i < num_cpus; i++) {
     cpu_.emplace_back(handle_, i);
@@ -285,7 +285,7 @@ hyperv_machine::allocate_guest_phys_memory(
   void *host_virtual_addr = allocate_virtual_memory(
       size,
       MEM_RESERVE | MEM_COMMIT,
-      PAGE_READWRITE);
+      PAGE_EXECUTE_READWRITE);
 
   if (host_virtual_addr == nullptr) {
     PANIC("failed to allocated virtual memory of size %lld bytes", size);

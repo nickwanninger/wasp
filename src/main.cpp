@@ -191,7 +191,7 @@ void runner_2(int id, const std::string &path, size_t ramsize) {
   zn_set_affinity(id);
   fprintf(stdout, "[tid %d] creating machine #%d\n", std::this_thread::get_id(), id);
   auto vm = get_clean<loader::elf_loader>(path, ramsize);
-  auto vm2 = get_clean<loader::elf_loader>(path, ramsize);
+  // auto vm2 = get_clean<loader::elf_loader>(path, ramsize);
 
   while (true) {
     std::unique_lock<std::mutex> lk(socket_lock);
@@ -317,16 +317,25 @@ bool run_test(std::string path, int run_count = 1,
 
   if (stdout_path != nullptr) {
     ofd = dup(1);
-    int new_fd = open(stdout_path, O_RDWR | O_CREAT | O_TRUNC, 0666);
+    // int new_fd = open(stdout_path, O_RDWR | O_CREAT | O_TRUNC, 0666);
+    FILE* file = fopen(stdout_path, "w+");
+  	if (file == nullptr)
+  	{
+        fprintf(stderr, "failed to open file\n");
+        return false;
+  	}
+
+    int new_fd = fileno(file);
     dup2(new_fd, 1);
-    close(new_fd);
+    // close(new_fd);
+    fclose(file);
   }
 
   auto start = std::chrono::high_resolution_clock::now();
 
   // TODO: Use the RAM size from what you're loading or throw if the loader
   // requested memory size is greater than the limit
-  machine::ptr vm = create_machine(5 * 1024l * 1024l);
+  machine::ptr vm = create_machine(1 * 1024l * 1024l);
   for (int i = 0; i < run_count; i++) {
     W work;
     vm->reset();
@@ -357,33 +366,39 @@ int main(int argc, char **argv) {
 	
 //  exit(0);
 
-//  run_test<boottime_workload, loader::flatbin_loader>("build/tests/boottime.bin", 1000,
-//                                              "data/boottime.csv");
+
+    run_test<boottime_workload, loader::flatbin_loader>("build/tests/boottime.bin");
+
+    getchar();
+    exit(0);
+	
+  run_test<boottime_workload, loader::flatbin_loader>("build/tests/boottime.bin", 1000,
+                                              "data/boottime.csv");
 
 //  if (argc <= 1) {
 //    fprintf(stderr, "usage: mobo [kernel.elf]\n");
 //    return -1;
 //  }
 
-  int nrunners = zn_get_processors_count();
-
-  int c;
-  while ((c = getopt(argc, argv, "t:")) != -1) switch (c) {
-      case 't':
-        nrunners = atoi(optarg);
-        break;
-      default:
-        printf("unexected flag '%c'\n", c);
-        exit(1);
-    }
-
-  printf("nprocs=%d\n", nrunners);
+  // int nrunners = zn_get_processors_count();
+  //
+  // int c;
+  // while ((c = getopt(argc, argv, "t:")) != -1) switch (c) {
+  //     case 't':
+  //       nrunners = atoi(optarg);
+  //       break;
+  //     default:
+  //       printf("unexected flag '%c'\n", c);
+  //       exit(1);
+  //   }
+  //
+  // printf("nprocs=%d\n", nrunners);
   // lele
   // signal(SIGPIPE, SIG_IGN);
 
-  nrunners = 1;
+  // nrunners = 1;
 //  test_throughput_2(argv[optind], nprocs);
-  test_throughput_2("./build/kernel.elf", nrunners);
+  // test_throughput_2("./build/kernel.elf", nrunners);
   //  auto machine = create_machine(argv[optind], 1);
   printf("success!");
   getchar();
