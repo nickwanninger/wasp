@@ -191,7 +191,7 @@ void runner_2(int id, const std::string &path, size_t ramsize) {
   zn_set_affinity(id);
   fprintf(stdout, "[tid %d] creating machine #%d\n", std::this_thread::get_id(), id);
   auto vm = get_clean<loader::elf_loader>(path, ramsize);
-  auto vm2 = get_clean<loader::elf_loader>(path, ramsize);
+//  auto vm2 = get_clean<loader::elf_loader>(path, ramsize);
 
   while (true) {
     std::unique_lock<std::mutex> lk(socket_lock);
@@ -354,12 +354,12 @@ int main(int argc, char **argv) {
 //
 //  run_test<fib_workload, loader::flatbin_loader>("build/tests/fib20.bin");
 //  run_test<fib_workload, loader::elf_loader>("build/tests/fib20.elf");
-	
-//  exit(0);
 
-//  run_test<boottime_workload, loader::flatbin_loader>("build/tests/boottime.bin", 1000,
-//                                              "data/boottime.csv");
 
+  run_test<boottime_workload, loader::flatbin_loader>("build/tests/boottime.bin", 1000,
+                                              "data/boottime.csv");
+
+  exit(0);
 //  if (argc <= 1) {
 //    fprintf(stderr, "usage: mobo [kernel.elf]\n");
 //    return -1;
@@ -381,9 +381,9 @@ int main(int argc, char **argv) {
   // lele
   // signal(SIGPIPE, SIG_IGN);
 
-  nrunners = 1;
+//  nrunners = 1;
 //  test_throughput_2(argv[optind], nprocs);
-  test_throughput_2("./build/kernel.elf", nrunners);
+//  test_throughput_2("./build/kernel.elf", nrunners);
   //  auto machine = create_machine(argv[optind], 1);
   printf("success!");
   getchar();
