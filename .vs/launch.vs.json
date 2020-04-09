@@ -1,0 +1,16 @@
+{
+  "version": "0.2.1",
+  "defaults": {},
+  "configurations": [
+    {
+      "type": "native",
+      "name": "mobo.exe [kernel.elf]",
+      "program": "mobo.exe",
+      "project": "CMakeLists.txt",
+      "args": [
+        "kernel.elf"
+      ],
+      "currentDir": "${workspaceRoot}"
+    }
+  ]
+}
