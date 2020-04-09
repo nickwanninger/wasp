@@ -6,3 +6,5 @@ cmake-build-debug/
 *.iso
 *.o
 *.ao
+
+target
