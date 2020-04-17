@@ -48,7 +48,6 @@ hyperv_machine::hyperv_machine(uint32_t num_cpus)
     , mem_(nullptr)
     , mem_size_(0)
 {
-  printf("DEBUG: page size -> %d bytes\n", PAGE_SIZE);
   ++instance_count;
   TIMEIT_MARK(g_main, __FUNCTION__);
   ensure_capability_or_throw();
@@ -57,6 +56,7 @@ hyperv_machine::hyperv_machine(uint32_t num_cpus)
   handle_ = handle;
 	
   set_num_cpus(handle, num_cpus);
+  set_extended_vm_exits(handle);
   setup_partition(handle);
   // setup_long_paging(handle);
 
@@ -92,6 +92,17 @@ void hyperv_machine::ensure_capability_or_throw()
   if (FAILED(hr)) {
     throw std::runtime_error("failed to create Hyper-V driver: feature not enabled");
   }
+
+  code = WHvCapabilityCodeExtendedVmExits;
+  hr = WHvGetCapability(code, &capability, sizeof(capability), &bytes_written);
+  if (FAILED(hr)) {
+    throw std::runtime_error("failed to create Hyper-V driver: feature not enabled");
+  }
+
+  auto& extended_exits = *reinterpret_cast<WHV_EXTENDED_VM_EXITS *>(&capability.ExceptionExitBitmap);
+  if (extended_exits.X64MsrExit == 0) {
+	throw std::runtime_error("failed to create Hyper-V driver: extended exits for msr not available");
+  }
 }
 
 WHV_PARTITION_HANDLE hyperv_machine::create_partition()
@@ -113,6 +124,15 @@ void hyperv_machine::setup_partition(WHV_PARTITION_HANDLE handle)
   if (FAILED(hr)) {
     PANIC("failed to create Hyper-V driver: WHvSetupPartition failed");
   }
+}
+
+void hyperv_machine::set_extended_vm_exits(WHV_PARTITION_HANDLE handle)
+{
+  WHV_PARTITION_PROPERTY_CODE code = WHvPartitionPropertyCodeExtendedVmExits;
+  WHV_PARTITION_PROPERTY property = {};
+  property.ExtendedVmExits.X64MsrExit = 1;
+  property.ExtendedVmExits.X64CpuidExit = 1;
+  set_partition_property(handle, code, property);
 }
 
 void hyperv_machine::set_num_cpus(WHV_PARTITION_HANDLE handle, uint32_t num_cpus)
@@ -141,40 +161,17 @@ void hyperv_machine::allocate_ram(size_t size) {
 void hyperv_machine::run(workload &work) {
   TIMEIT_FN(g_main);
 
-  bool halted = false;
   while (true) {
-    halted = false;
-
     mobo::regs_t snapshot_regs_pre = {};
     cpu_[0].read_regs_into(snapshot_regs_pre);
-//
-//    mobo::regs_special_t snapshot_sregs_pre = {};
-//    cpu_[0].read_regs_special_into(snapshot_sregs_pre);
 
-    printf("================= (1) PRE-EXECUTE =================== \n");
-    cpu_[0].dump_state(stdout);
-    printf("===================================================== \n");
+//    printf("================= (1) PRE-EXECUTE =================== \n");
+//    cpu_[0].dump_state(stdout);
+//    printf("===================================================== \n");
 
     TIMEIT_BEGIN(g_main, vcpu, "vcpu run");
     WHV_RUN_VP_EXIT_CONTEXT run = cpu_[0].run();
     TIMEIT_END(g_main, vcpu);
-
-//    if (stat == KVM_EXIT_SHUTDOWN) {
-//      shutdown = true;
-//      printf("SHUTDOWN (probably a triple fault)\n");
-//
-//      printf("%d\n", run->internal.suberror);
-//
-//      cpus[0].dump_state(stderr, (char *)this->mem);
-//      throw std::runtime_error("triple fault");
-//      return;
-//    }
-
-//    mobo::regs_t snapshot_regs = {};
-//    cpu_[0].read_regs_into(snapshot_regs);
-//
-//    mobo::regs_special_t snapshot_sregs = {};
-//    cpu_[0].read_regs_special_into(snapshot_sregs);
 
 //    printf("================= (2) POST-EXECUTE =================== \n");
 //    cpu_[0].dump_state(stdout);
@@ -185,80 +182,85 @@ void hyperv_machine::run(workload &work) {
     mobo::regs_t regs = {};
     cpu_[0].read_regs_into(regs);
 
-	WHV_PARTITION_PROPERTY prop = {};
-	uint32_t prop_written = 0;
-	HRESULT hr = WHvGetPartitionProperty(handle_, WHvPartitionPropertyCodeExceptionExitBitmap, &prop, sizeof(WHV_PARTITION_PROPERTY), &prop_written);
-
-//    printf("exit: %d (%s) at rip = 0x%llx\n",
-//           reason,
-//           mobo::hyperv_exit_reason_str(reason),
-//           regs.rip);
-
     // Handle jump to protected mode by emulating the instruction to set RIP
     if (reason == WHvRunVpExitReasonUnrecoverableException
         && run.VpContext.InstructionLength == 3) {
 
       auto jmp_instr = static_cast<uint8_t *>(gpa2hpa(run.VpContext.Rip));
       if (jmp_instr[0] == 0xEA) {
-        uint16_t segment = ((uint16_t) jmp_instr[2]) << 8u;
-        uint16_t offset = (uint16_t) jmp_instr[1];
-        uint16_t addr = segment | offset;
-        
-        mobo::regs_t jmp_regs = {};
-        cpu_[0].read_regs_into(jmp_regs);
-        jmp_regs.rip = addr;
-        cpu_[0].write_regs(jmp_regs);
+        regs_special_t regs_special = {};
+        cpu_[0].read_regs_special_into(regs_special);
+        uint8_t sel = jmp_instr[3];
+        regs_special.cs.selector = sel;
+
+        uint16_t high = ((uint16_t) jmp_instr[2]) << 8u;
+        uint16_t low = (uint16_t) jmp_instr[1];
+        uint16_t addr = high | low;
+        regs.rip = addr;
+
+        cpu_[0].write_regs_special(regs_special);
+        cpu_[0].write_regs(regs);
         continue;
       }
     }
 
-    if (reason == WHvRunVpExitReasonX64IoPortAccess) {
-      uint16_t port_num = run.IoPortAccess.PortNumber;
-      if (port_num == 0xFA) {
-        // special exit call
-        work.handle_exit();
-        return;
+    // Handle `rdmsr` (Read Machine Specific Register)
+    //    and `wrmsr` (Write Machine Specific Register)
+    //
+    // Unlike KVM, we have to explicitly handle MSR exits. Right now we only care about handling x68 EFER.
+    //
+#define MSR_EFER (0xC0000080)
+
+    if (reason == WHvRunVpExitReasonX64MsrAccess
+        && regs.rcx == MSR_EFER) {
+
+      regs_special_t regs_special = {};
+      cpu_[0].read_regs_special_into(regs_special);
+
+      if (run.MsrAccess.AccessInfo.IsWrite) {
+        regs_special.efer = regs.rax;
+        cpu_[0].write_regs_special(regs_special);
+      } else {
+        regs.rax = regs_special.efer;
       }
 
-      // 0xFF is the "hcall" io op
-      if (port_num == 0xFF) {
-        mobo::regs_t hcall_regs = {};
-        cpu_[0].read_regs_into(hcall_regs);
-        int res = work.handle_hcall(hcall_regs, mem_size_, mem_);
+      // Continue execution past the `rdmsr`/`wrmsr` instruction
+      uint8_t skip = run.VpContext.InstructionLength;
+      regs.rip += skip;
 
-        if (res == WORKLOAD_RES_KILL) {
-          return;
-        }
-
-        // Continue execution past the `out` instruction
-        uint8_t skip = run.VpContext.InstructionLength;
-        hcall_regs.rip += skip;
-//        printf("%s: rip += %d\n", __FUNCTION__, skip);
-        
-        cpu_[0].write_regs(hcall_regs);
-        continue;
-      }
-
-      fprintf(stderr, "%s: unhandled io port 0x%x\n", __FUNCTION__, port_num);
-      cpu_[0].dump_state(stderr);
-      return;
+      cpu_[0].write_regs(regs);
+      continue;
     }
 
-//    if (stat == KVM_EXIT_INTERNAL_ERROR) {
-//      if (run->internal.suberror == KVM_INTERNAL_ERROR_EMULATION) {
-//        fprintf(stderr, "emulation failure\n");
-//        cpus[0].dump_state(stderr);
-//        return;
-//      }
-//      printf("kvm internal error: suberror %d\n", run->internal.suberror);
-//      return;
-//    }
-//
-//    if (stat == KVM_EXIT_FAIL_ENTRY) {
-//      shutdown = true;
-//      halted = true;
-//      return;
-//    }
+	if (reason == WHvRunVpExitReasonX64IoPortAccess) {
+		uint16_t port_num = run.IoPortAccess.PortNumber;
+		if (port_num == 0xFA) {
+			// special exit call
+			work.handle_exit();
+			return;
+		}
+
+		// 0xFF is the "hcall" io op
+		if (port_num == 0xFF) {
+			int res = work.handle_hcall(regs, mem_size_, mem_);
+
+			if (res == WORKLOAD_RES_KILL) {
+				return;
+			}
+
+			// Continue execution past the `out` instruction
+			uint8_t skip = run.VpContext.InstructionLength;
+			regs.rip += skip;
+
+			cpu_[0].write_regs(regs);
+			continue;
+		}
+
+		fprintf(stderr, "%s: unhandled io port 0x%x\n", __FUNCTION__, port_num);
+		cpu_[0].dump_state(stderr);
+		return;
+	}
+
     printf("unhandled exit! %d (%s) at rip = 0x%llx\n",
            reason,
            mobo::hyperv_exit_reason_str(reason),
@@ -309,7 +311,7 @@ hyperv_machine::allocate_guest_phys_memory(
       MEM_RESERVE | MEM_COMMIT,
       PAGE_EXECUTE_READWRITE);
 
-  printf("allocate_virtual_memory -> %p\n", host_virtual_addr);
+  fprintf(stderr, "allocate_virtual_memory -> %p\n", host_virtual_addr);
   if (host_virtual_addr == nullptr) {
     PANIC("failed to allocated virtual memory of size %lld bytes", size);
   }
@@ -363,8 +365,8 @@ void hyperv_machine::map_guest_physical_addr_range(
     WHV_MAP_GPA_RANGE_FLAGS flags)
 {
   TIMEIT_FN(g_main, __FUNCTION__);
-  printf("%s(handle = 0x%p, host_addr = 0x%p, guest_addr = 0x%llx, size = %lld, flags = %d\n",
-      __FUNCTION__, handle, host_addr, guest_addr, size, flags);
+//  printf("%s(handle = 0x%p, host_addr = 0x%p, guest_addr = 0x%llx, size = %lld, flags = %d\n",
+//      __FUNCTION__, handle, host_addr, guest_addr, size, flags);
 
   // IMPORTANT: Fails if `size` is not page aligned
   if (size % PAGE_ALIGNMENT != 0) {

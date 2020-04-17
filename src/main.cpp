@@ -343,6 +343,8 @@ bool run_test(std::string path, int run_count = 1,
   }
   auto end = std::chrono::high_resolution_clock::now();
 
+  fflush(stdout);
+
   if (ofd != -1) {
     dup2(ofd, 1);
     close(ofd);
@@ -368,13 +370,14 @@ int main(int argc, char **argv) {
 //  exit(0);
 
 //    run_test<boottime_workload, loader::flatbin_loader>("build/tests/boottime.bin");
-    run_test<boottime_workload, loader::elf_loader>("build/tests/boottime.elf");
+    //run_test<boottime_workload, loader::elf_loader>("build/tests/boottime.elf");
 
-    getchar();
+	run_test<boottime_workload, loader::flatbin_loader>("build/tests/boottime.bin", 1000,
+		"data/boottime_hyperv.csv");
+
+    //getchar();
     exit(0);
 	
-  run_test<boottime_workload, loader::flatbin_loader>("build/tests/boottime.bin", 1000,
-                                              "data/boottime.csv");
 
 //  if (argc <= 1) {
 //    fprintf(stderr, "usage: mobo [kernel.elf]\n");

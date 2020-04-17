@@ -28,6 +28,7 @@ private:
   static void ensure_capability_or_throw();
   static WHV_PARTITION_HANDLE create_partition();
   static void setup_partition(WHV_PARTITION_HANDLE handle);
+  static void set_extended_vm_exits(WHV_PARTITION_HANDLE handle);
   static void set_num_cpus(WHV_PARTITION_HANDLE handle, uint32_t num_cpus);
   static void set_partition_property(WHV_PARTITION_HANDLE handle, WHV_PARTITION_PROPERTY_CODE code, WHV_PARTITION_PROPERTY &property);
   void *allocate_guest_phys_memory(WHV_PARTITION_HANDLE handle, uint64_t guest_addr, size_t size);
