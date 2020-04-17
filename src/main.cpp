@@ -42,8 +42,6 @@ static void add_dirty(mobo::machine::ptr v) {
   dirty_signal.notify_one();
 }
 
-machine::ptr create_machine(size_t memsize);
-
 template <class L>
 static std::shared_ptr<mobo::machine> get_clean(
     const std::string &path, size_t memsize)
@@ -62,17 +60,10 @@ static std::shared_ptr<mobo::machine> get_clean(
   {
     std::scoped_lock lock(create_lock);
     L loader(path);
-    machine::ptr v = create_machine(memsize);
+    machine::ptr v = machine::create(memsize);
     loader.inject(*v);
     return v;
   }
-}
-
-machine::ptr create_machine(size_t memsize) {
-  machine::ptr v = platform::create(PLATFORM_ANY);
-  v->allocate_ram(memsize);
-  v->reset();
-  return v;
 }
 
 auto cleaner(void) {
@@ -334,7 +325,7 @@ bool run_test(std::string path, int run_count = 1,
 
   // TODO: Use the RAM size from what you're loading or throw if the loader
   // requested memory size is greater than the limit
-  machine::ptr vm = create_machine(1 * 1024l * 1024l);
+  machine::ptr vm = machine::create(1 * 1024l * 1024l);
   for (int i = 0; i < run_count; i++) {
     W work;
     vm->reset();

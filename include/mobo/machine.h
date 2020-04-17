@@ -53,7 +53,7 @@ public:
 
   machine() = default;
   virtual ~machine();
-  void load_elf(std::string file);
+  static machine::ptr create(size_t memsize);
 
   template <typename T>
   inline auto val_at(off_t gpa) -> T& {
