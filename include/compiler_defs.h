@@ -18,6 +18,7 @@
                 __LINE__, \
                 __VA_ARGS__); \
         fflush(stderr); \
+        getchar(); \
         exit(1); \
     } while (0)
 

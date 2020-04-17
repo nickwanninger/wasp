@@ -340,7 +340,8 @@ void *hyperv_vcpu::translate_address(u64 gva)
 void hyperv_vcpu::reset()
 {
   // TODO: deal with protected mode, and figure out why it's broken...
-  reset_long();
+//  reset_long();
+  reset_real();
 }
 
 WHV_RUN_VP_EXIT_CONTEXT hyperv_vcpu::run() {
@@ -356,6 +357,18 @@ WHV_RUN_VP_EXIT_CONTEXT hyperv_vcpu::run() {
   }
 
   return exit_context;
+}
+
+void hyperv_vcpu::reset_real()
+{
+  regs_special_t s = {};
+  read_regs_special_into(s);
+  s.cs.selector = 0;
+  s.cs.base = 0;
+  s.cr0 &= ~(1u);
+  s.cr0 &= ~(1u << 31u);
+  s.cr3 = 0;
+  write_regs_special(s);
 }
 
 void hyperv_vcpu::reset_protected()

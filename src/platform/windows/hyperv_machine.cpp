@@ -151,9 +151,9 @@ void hyperv_machine::run(workload &work) {
 //    mobo::regs_special_t snapshot_sregs_pre = {};
 //    cpu_[0].read_regs_special_into(snapshot_sregs_pre);
 
-//    printf("================= (1) PRE-EXECUTE =================== \n");
-//    cpu_[0].dump_state(stdout);
-//    printf("===================================================== \n");
+    printf("================= (1) PRE-EXECUTE =================== \n");
+    cpu_[0].dump_state(stdout);
+    printf("===================================================== \n");
 
     TIMEIT_BEGIN(g_main, vcpu, "vcpu run");
     WHV_RUN_VP_EXIT_CONTEXT run = cpu_[0].run();
@@ -185,10 +185,32 @@ void hyperv_machine::run(workload &work) {
     mobo::regs_t regs = {};
     cpu_[0].read_regs_into(regs);
 
+	WHV_PARTITION_PROPERTY prop = {};
+	uint32_t prop_written = 0;
+	HRESULT hr = WHvGetPartitionProperty(handle_, WHvPartitionPropertyCodeExceptionExitBitmap, &prop, sizeof(WHV_PARTITION_PROPERTY), &prop_written);
+
 //    printf("exit: %d (%s) at rip = 0x%llx\n",
 //           reason,
 //           mobo::hyperv_exit_reason_str(reason),
 //           regs.rip);
+
+    // Handle jump to protected mode by emulating the instruction to set RIP
+    if (reason == WHvRunVpExitReasonUnrecoverableException
+        && run.VpContext.InstructionLength == 3) {
+
+      auto jmp_instr = static_cast<uint8_t *>(gpa2hpa(run.VpContext.Rip));
+      if (jmp_instr[0] == 0xEA) {
+        uint16_t segment = ((uint16_t) jmp_instr[2]) << 8u;
+        uint16_t offset = (uint16_t) jmp_instr[1];
+        uint16_t addr = segment | offset;
+        
+        mobo::regs_t jmp_regs = {};
+        cpu_[0].read_regs_into(jmp_regs);
+        jmp_regs.rip = addr;
+        cpu_[0].write_regs(jmp_regs);
+        continue;
+      }
+    }
 
     if (reason == WHvRunVpExitReasonX64IoPortAccess) {
       uint16_t port_num = run.IoPortAccess.PortNumber;
@@ -287,6 +309,7 @@ hyperv_machine::allocate_guest_phys_memory(
       MEM_RESERVE | MEM_COMMIT,
       PAGE_EXECUTE_READWRITE);
 
+  printf("allocate_virtual_memory -> %p\n", host_virtual_addr);
   if (host_virtual_addr == nullptr) {
     PANIC("failed to allocated virtual memory of size %lld bytes", size);
   }

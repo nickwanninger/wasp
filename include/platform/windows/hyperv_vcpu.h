@@ -10,6 +10,7 @@ class hyperv_vcpu : public mobo::vcpu {
   WHV_PARTITION_HANDLE partition_handle_;
   uint32_t cpu_index_;
 
+  void reset_real();
   void reset_protected();
   void reset_long();
 
