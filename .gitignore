@@ -1,10 +1,15 @@
 build/
 out/
 cmake-build-debug/
-.vs/
+target/
+
+!.vs/
+!.vs/launch.vs.json  # keep debug launch settings
+.vs/**
+
 .idea/
+
 *.iso
 *.o
 *.ao
-
-target
+*temp

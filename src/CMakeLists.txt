@@ -32,6 +32,14 @@ target_sources(mobo
         vcpu.cpp
         machine.cpp
         platform.cpp
+
+        loader/elf_loader.cpp
+        loader/flatbin_loader.cpp
+
+        workload/boottime_workload.cpp
+        workload/double_workload.cpp
+        workload/fib_workload.cpp
+        workload/tcp_workload.cpp
         )
 
 if (WIN32)
@@ -52,6 +60,7 @@ if (WIN32)
             PRIVATE
             winhvplatform.lib  # Hyper-V
             ws2_32.lib  # WinSock 2
+            mincore.lib  # support `VirtualAlloc2`
             )
 
 elseif(LINUX)

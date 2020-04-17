@@ -1,8 +1,4 @@
-#include <inttypes.h>
 #include <mobo/machine.h>
-#include <stdio.h>
-//#include <sys/mman.h>
-#include <mobo/memwriter.h>
 #include <mobo/types.h>
 #include <mobo/vcpu.h>
 
@@ -78,49 +74,5 @@ void machine::load_elf(std::string file) {
     */
 
     // setup general purpose registers
-    {
-      struct regs r;
-      cpu(0).read_regs(r);
-      r.rdi = 0x4242424242424242L;
-      r.rsi = hypertable;  // TODO: The physical address of the hypertable
-      // information
-      r.rip = entry;
-      r.rflags &= ~(1 << 17);
-      r.rflags &= ~(1 << 9);
-      cpu(0).write_regs(r);
-    }
-
-    // setup the special registers
-    {
-      sregs sr;
-      cpu(0).read_sregs(sr);
-
-      auto init_seg = [](mobo::segment &seg) {
-        seg.present = 1;
-        seg.base = 0;
-        seg.db = 1;
-        seg.g = 1;
-        seg.selector = 0x10;
-        seg.limit = 0xFFFFFFF;
-        seg.type = 0x3;
-      };
-
-      init_seg(sr.cs);
-      sr.cs.selector = 0x08;
-      sr.cs.type = 0x0a;
-      sr.cs.s = 1;
-      init_seg(sr.ds);
-      init_seg(sr.es);
-      init_seg(sr.fs);
-      init_seg(sr.gs);
-      init_seg(sr.ss);
-
-      // clear bit 31, set bit 0
-      sr.cr0 &= ~(1 << 31);
-      sr.cr0 |= (1 << 0);
-
-      cpu(0).write_sregs(sr);
-    }
   }
 }
-

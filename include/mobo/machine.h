@@ -13,13 +13,45 @@
 
 namespace mobo {
 
+namespace memory {
+
+struct page_entry_t
+{
+  union
+  {
+    struct
+    {
+      uint64_t present : 1;
+      uint64_t write : 1; // If 0, writes not allowed.
+      uint64_t allow_user_mode : 1; // If 0, user-mode accesses not allowed.
+      uint64_t write_through : 1;
+      uint64_t cache_disable : 1;
+      uint64_t accessed : 1;
+      uint64_t dirty : 1;
+      uint64_t large_page : 1; // Must be 0 for PML4E.
+      uint64_t available : 4;
+      uint64_t page_frame_num : 36;
+      uint64_t reserved_hardware : 4;
+      uint64_t reserved_software : 11;
+      uint64_t no_execute : 1; // If 1, instruction fetches not allowed.
+    };
+    uint64_t Value;
+  };
+};
+static_assert(sizeof(struct page_entry_t) == sizeof(uint64_t), "expected 64-bit page entry");
+
+} // namespace memory
+
+
 class driver;
 
 class machine {
- public:
+  uint64_t entry_ = (uint64_t) -1;
+
+public:
   typedef std::shared_ptr<machine> ptr;
 
-  explicit machine(void) {};
+  machine() = default;
   virtual ~machine();
   void load_elf(std::string file);
 
@@ -36,6 +68,8 @@ class machine {
 
   virtual uint32_t num_cpus() = 0;
   virtual mobo::vcpu &cpu(uint32_t) = 0;
+  inline uint64_t entry() { return entry_; }
+  inline void set_entry(uint64_t entry) { entry_ = entry; }
 };
 
 

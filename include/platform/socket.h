@@ -12,3 +12,13 @@
 #error "unsupported platform"
 
 #endif
+
+int
+zn_socket_close(zn_socket_t socket);
+
+/**
+ * Runs any platform specific initialization to setup support for sockets
+ */
+void
+zn_socket_init();
+
