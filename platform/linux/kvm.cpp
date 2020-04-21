@@ -12,10 +12,10 @@
 #include <algorithm>
 #include <stdexcept>
 
-#include <mobo/multiboot.h>
-#include <mobo/platform/linux/kvm.h>
+#include <wasp/multiboot.h>
+#include <wasp/platform/linux/kvm.h>
 
-using namespace mobo;
+using namespace wasp;
 
 #define DEFINE_KVM_EXIT_REASON(reason) [reason] = #reason
 
@@ -76,7 +76,7 @@ kvm_machine::kvm_machine(int kvmfd, int ncpus) : kvmfd(kvmfd), ncpus(ncpus) {
   init_cpus();
 }
 
-mobo::kvm_machine::~kvm_machine() {
+wasp::kvm_machine::~kvm_machine() {
   // need to close the vmfd, and all cpu fds
   for (auto &cpu : cpus) {
     close(cpu.cpufd);
@@ -358,7 +358,7 @@ void kvm_machine::reset(void) {
 }
 
 uint32_t kvm_machine::num_cpus(void) {return cpus.size(); }
-mobo::vcpu &kvm_machine::cpu(uint32_t i) {return cpus[i]; }
+wasp::vcpu &kvm_machine::cpu(uint32_t i) {return cpus[i]; }
 
 void kvm_vcpu::reset(void) {
   ioctl(cpufd, KVM_SET_REGS, &initial_regs);
@@ -584,7 +584,7 @@ static machine::ptr kvm_allocate(void) {
   return std::make_shared<kvm_machine>(kvmfd, 1);
 }
 
-mobo::platform::registration __kvm__reg__ __register_platform = {
+wasp::platform::registration __kvm__reg__ __register_platform = {
     .name = "KVM",
     .flags = PLATFORM_LINUX,
     .allocate = kvm_allocate,

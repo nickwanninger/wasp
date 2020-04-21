@@ -1,8 +1,8 @@
 #include <chrono>
 
 #include <timeit.h>
-#include <mobo/platform.h>
-#include <mobo/workload.h>
+#include <wasp/platform.h>
+#include <wasp/workload.h>
 
 #include "tcp_workload.h"
 
@@ -26,7 +26,7 @@ static bool send_all(int socket, void *buffer, size_t length) {
 
 tcp_workload::tcp_workload(zn_socket_t sock) : socket(sock) {}
 
-int tcp_workload::handle_hcall(struct mobo::regs_t &regs, size_t ramsize,
+int tcp_workload::handle_hcall(struct wasp::regs_t &regs, size_t ramsize,
                                void *ram) {
   TIMEIT_FN(g_main);
 

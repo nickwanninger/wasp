@@ -1,10 +1,10 @@
-#include <mobo/runner.hpp>
-#include <mobo/loader.h>
+#include <wasp/runner.hpp>
+#include <wasp/loader.h>
 
 #include "./workload.h"
 
 int main()
 {
-  mobo::run<double_workload, mobo::loader::flatbin_loader>("build/tests/double64.bin");
+  wasp::run<double_workload, wasp::loader::flatbin_loader>("build/tests/double64.bin");
   exit(0);
 }

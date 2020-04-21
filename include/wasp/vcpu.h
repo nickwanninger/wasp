@@ -35,7 +35,7 @@
 #define VIP_MASK 0x00100000u
 #define ID_MASK 0x00200000u
 
-namespace mobo {
+namespace wasp {
 
 #define NR_INTERRUPTS 256
 
@@ -125,10 +125,10 @@ class guest_array {
   // if not, then we need to find the new mapping
   u64 gpn = -1;
   u64 ppn = -1;
-  mobo::vcpu *cpu = nullptr;
+  wasp::vcpu *cpu = nullptr;
 
  public:
-  guest_array(mobo::vcpu *cpu, u64 base) : cpu(cpu), base(base) {}
+  guest_array(wasp::vcpu *cpu, u64 base) : cpu(cpu), base(base) {}
 
   T &operator[](size_t off) {
     u64 gva = base + off;
@@ -149,6 +149,6 @@ class guest_array {
   }
 };
 
-};  // namespace mobo
+};  // namespace wasp
 
 #endif

@@ -1,4 +1,4 @@
-#include "compiler_defs.h"
+#include <wasp/compiler_defs.h>
 #include <stdexcept>
 #include <chrono>
 #include <iostream>
@@ -7,11 +7,11 @@
 #include <winerror.h>
 
 #include <timeit.h>
-#include <mobo/memory.h>
-#include <mobo/platform/windows/hyperv_vcpu.h>
+#include <wasp/memory.h>
+#include <wasp/platform/windows/hyperv_vcpu.h>
 
-using namespace mobo;
-using namespace mobo::memory;
+using namespace wasp;
+using namespace wasp::memory;
 
 hyperv_vcpu::hyperv_vcpu(
     WHV_PARTITION_HANDLE partition_handle,
@@ -113,7 +113,7 @@ constexpr uint32_t k_hyperv_mapping_regs_special_count = std::extent<decltype(k_
 typedef WHV_REGISTER_VALUE hyperv_reg_values_t[k_hyperv_mapping_regs_count];
 typedef WHV_REGISTER_VALUE hyperv_reg_special_values_t[k_hyperv_mapping_regs_special_count];
 
-void hyperv_vcpu::read_regs_into(mobo::regs_t &r)
+void hyperv_vcpu::read_regs_into(wasp::regs_t &r)
 {
   HRESULT result;
 
@@ -152,7 +152,7 @@ void hyperv_vcpu::read_regs_into(mobo::regs_t &r)
   r.rflags = values[hyperv_mapping_reg_index::rflags].Reg64;
 }
 
-void hyperv_vcpu::write_regs(mobo::regs_t &r)
+void hyperv_vcpu::write_regs(wasp::regs_t &r)
 {
   hyperv_reg_values_t values = {};
   values[hyperv_mapping_reg_index::rax].Reg64 = r.rax;
@@ -190,7 +190,7 @@ void hyperv_vcpu::write_regs(mobo::regs_t &r)
   }
 }
 
-void hyperv_vcpu::read_regs_special_into(mobo::regs_special_t &r) {
+void hyperv_vcpu::read_regs_special_into(wasp::regs_special_t &r) {
   HRESULT result;
 
   hyperv_reg_special_values_t values = {};
@@ -205,7 +205,7 @@ void hyperv_vcpu::read_regs_special_into(mobo::regs_special_t &r) {
     throw std::runtime_error("failed to read Hyper-V special registers");
   }
 
-  static auto copy_segment = [](mobo::segment_t &dst, WHV_REGISTER_VALUE &src_value) {
+  static auto copy_segment = [](wasp::segment_t &dst, WHV_REGISTER_VALUE &src_value) {
     WHV_X64_SEGMENT_REGISTER &src = src_value.Segment;
 
     dst.base = src.Base;
@@ -254,11 +254,11 @@ void hyperv_vcpu::read_regs_special_into(mobo::regs_special_t &r) {
 //  }
 }
 
-void hyperv_vcpu::write_regs_special(mobo::regs_special_t &r)
+void hyperv_vcpu::write_regs_special(wasp::regs_special_t &r)
 {
   hyperv_reg_special_values_t values = {};
 
-  static auto copy_segment = [](mobo::segment_t &src, WHV_REGISTER_VALUE &dst_value) {
+  static auto copy_segment = [](wasp::segment_t &src, WHV_REGISTER_VALUE &dst_value) {
     WHV_X64_SEGMENT_REGISTER &dst = dst_value.Segment;
 
     dst.Base = src.base;
@@ -323,11 +323,11 @@ void hyperv_vcpu::write_regs_special(mobo::regs_special_t &r)
   }
 }
 
-void hyperv_vcpu::read_regs_fpu_into(mobo::regs_fpu_t &regs) {
+void hyperv_vcpu::read_regs_fpu_into(wasp::regs_fpu_t &regs) {
   // TODO
 }
 
-void hyperv_vcpu::write_regs_fpu(mobo::regs_fpu_t &regs) {
+void hyperv_vcpu::write_regs_fpu(wasp::regs_fpu_t &regs) {
   // TODO
 }
 
@@ -386,7 +386,7 @@ void hyperv_vcpu::reset_protected()
     regs_special_t sr = {};
     read_regs_special_into(sr);
 
-    auto init_seg = [](mobo::segment_t &seg) {
+    auto init_seg = [](wasp::segment_t &seg) {
       seg.present = 1;
       seg.base = 0;
       seg.db = 1;
@@ -416,8 +416,8 @@ void hyperv_vcpu::reset_protected()
 
 void hyperv_vcpu::reset_long()
 {
-  struct mobo::regs_t r = {};
-  struct mobo::regs_special_t s = {};
+  struct wasp::regs_t r = {};
+  struct wasp::regs_special_t s = {};
   read_regs_into(r);
   read_regs_special_into(s);
 
@@ -461,7 +461,7 @@ void hyperv_vcpu::reset_long()
 
   // Enable paging
   s.cr0 = CR0_PE | CR0_MP | CR0_ET | CR0_NE | CR0_WP | CR0_AM | CR0_PG;
-  s.cr3 = mobo::memory::PML4_PHYSICAL_ADDRESS;
+  s.cr3 = wasp::memory::PML4_PHYSICAL_ADDRESS;
   s.cr4 = CR4_PAE | CR4_OSFXSR | CR4_OSXMMEXCPT;
   s.efer = EFER_LME | EFER_LMA;
 

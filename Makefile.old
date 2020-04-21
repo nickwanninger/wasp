@@ -51,12 +51,12 @@ DFLAGS=-g -DDEBUG -O0
 # By default, build the example kernel using make and the vmm using stack
 default: build $(KERNEL) $(FILEDEPS)
 	@stack build
-	@cp $$(find . | grep "/bin/mobo") build/
+	@cp $$(find . | grep "/bin/wasp") build/
 
 
 fast: build $(KERNEL) $(FILEDEPS)
 	@stack build --fast
-	@cp $$(find . | grep "/bin/mobo") build/
+	@cp $$(find . | grep "/bin/wasp") build/
 
 build:
 	@mkdir -p build
@@ -98,7 +98,7 @@ klean:
 
 
 clean: klean
-	rm -rf $(shell find . -type f | grep "mobo\$$")
+	rm -rf $(shell find . -type f | grep "wasp\$$")
 	rm -rf $(shell find . | grep "\.o\$$")
 	rm -rf build
 

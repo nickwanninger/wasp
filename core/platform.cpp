@@ -1,4 +1,4 @@
-#include <mobo/machine.h>
+#include <wasp/machine.h>
 
 #ifdef _MSC_VER
 
@@ -12,14 +12,14 @@ __declspec(allocate("vm_platforms$z"))
 __declspec(align(sizeof(void *)))
 static struct __phantom __msvc_stop_vm_platforms;
 
-const mobo::platform::registration *const __start_vm_platforms = reinterpret_cast<const mobo::platform::registration *const>(&__msvc_start_vm_platforms);
-const mobo::platform::registration *const __stop_vm_platforms = reinterpret_cast<const mobo::platform::registration *const>(&__msvc_stop_vm_platforms);
+const wasp::platform::registration *const __start_vm_platforms = reinterpret_cast<const wasp::platform::registration *const>(&__msvc_start_vm_platforms);
+const wasp::platform::registration *const __stop_vm_platforms = reinterpret_cast<const wasp::platform::registration *const>(&__msvc_stop_vm_platforms);
 
 #pragma init_seg("vm_platforms")
 
 #endif
 
-mobo::machine::ptr mobo::platform::create(int flags) {
+wasp::machine::ptr wasp::platform::create(int flags) {
 
   for (auto *plat = __start_vm_platforms; plat < __stop_vm_platforms; plat++) {
     if ((plat->flags & flags) != 0) {

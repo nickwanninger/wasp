@@ -1,12 +1,12 @@
-#include <mobo/machine.h>
-#include <mobo/types.h>
-#include <mobo/vcpu.h>
+#include <wasp/machine.h>
+#include <wasp/types.h>
+#include <wasp/vcpu.h>
 
 #include <elfio/elfio.hpp>
 
-using namespace mobo;
+using namespace wasp;
 
-mobo::machine::~machine(void) = default;
+wasp::machine::~machine(void) = default;
 
 machine::ptr machine::create(size_t memsize)
 {

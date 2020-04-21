@@ -6,22 +6,22 @@
 #include <stdexcept>
 #include <atomic>
 #include <chrono>
-#include <mobo/unistd.h>
-#include "compiler_defs.h"
+#include <wasp/unistd.h>
+#include <wasp/compiler_defs.h>
+#include <wasp/machine.h>
+#include <wasp/platform.h>
 
-#include "timeit.h"
-#include "mobo/machine.h"
-#include "mobo/platform.h"
+#include <timeit.h>
 
 TIMEIT_EXTERN(g_main);
 
-using namespace mobo;
-using namespace mobo::memory;
+using namespace wasp;
+using namespace wasp::memory;
 
 const uint32_t hyperv_machine::PAGE_SIZE = hyperv_machine::get_page_size();
 const uint32_t hyperv_machine::PAGE_ALIGNMENT = hyperv_machine::get_page_alignment();
 
-const char *mobo::hyperv_exit_reason_str(WHV_RUN_VP_EXIT_REASON reason)
+const char *wasp::hyperv_exit_reason_str(WHV_RUN_VP_EXIT_REASON reason)
 {
   switch (reason) {
     case WHvRunVpExitReasonNone: return "WHvRunVpExitReasonNone";
@@ -162,7 +162,7 @@ void hyperv_machine::run(workload &work) {
   TIMEIT_FN(g_main);
 
   while (true) {
-    mobo::regs_t snapshot_regs_pre = {};
+    wasp::regs_t snapshot_regs_pre = {};
     cpu_[0].read_regs_into(snapshot_regs_pre);
 
 //    printf("================= (1) PRE-EXECUTE =================== \n");
@@ -179,7 +179,7 @@ void hyperv_machine::run(workload &work) {
 
     WHV_RUN_VP_EXIT_REASON reason = run.ExitReason;
 
-    mobo::regs_t regs = {};
+    wasp::regs_t regs = {};
     cpu_[0].read_regs_into(regs);
 
     // Handle jump to protected mode by emulating the instruction to set RIP
@@ -263,7 +263,7 @@ void hyperv_machine::run(workload &work) {
 
     printf("unhandled exit! %d (%s) at rip = 0x%llx\n",
            reason,
-           mobo::hyperv_exit_reason_str(reason),
+           wasp::hyperv_exit_reason_str(reason),
            regs.rip);
 
     cpu_[0].dump_state(stdout);
@@ -389,7 +389,7 @@ uint32_t hyperv_machine::num_cpus() {
   return cpu_.size();
 }
 
-mobo::vcpu &hyperv_machine::cpu(uint32_t index) {
+wasp::vcpu &hyperv_machine::cpu(uint32_t index) {
   return cpu_[index];
 }
 
@@ -432,9 +432,9 @@ uint64_t hyperv_machine::setup_long_paging(WHV_PARTITION_HANDLE handle)
        - PD index - page directory index (level 2)
     */
 
-  static uint64_t phys_addr = mobo::memory::PML4_PHYSICAL_ADDRESS;
+  static uint64_t phys_addr = wasp::memory::PML4_PHYSICAL_ADDRESS;
 
-  uint64_t PTE_SIZE = sizeof(struct mobo::memory::page_entry_t);
+  uint64_t PTE_SIZE = sizeof(struct wasp::memory::page_entry_t);
 
   uint64_t USN_PAGE_SIZE = 0x1000;
   uint64_t NUM_LVL3_ENTRIES = 1;
@@ -452,8 +452,8 @@ uint64_t hyperv_machine::setup_long_paging(WHV_PARTITION_HANDLE handle)
     throw std::runtime_error("allocate_guest_phys_memory: failed to allocate page table in guest");
   }
 
-  auto pml4 = static_cast<mobo::memory::page_entry_t *>(pte_ptr);
-  auto pml3 = static_cast<mobo::memory::page_entry_t *>((void *)((char *) pte_ptr + PML4_SIZE));
+  auto pml4 = static_cast<wasp::memory::page_entry_t *>(pte_ptr);
+  auto pml3 = static_cast<wasp::memory::page_entry_t *>((void *)((char *) pte_ptr + PML4_SIZE));
 
   //
   // Build a valid user-mode PML4E
@@ -462,12 +462,12 @@ uint64_t hyperv_machine::setup_long_paging(WHV_PARTITION_HANDLE handle)
   pml4[0].present = 1;
   pml4[0].write = 1;
   pml4[0].allow_user_mode = 1;
-  pml4[0].page_frame_num = (mobo::memory::PML4_PHYSICAL_ADDRESS / USN_PAGE_SIZE) + 1;
+  pml4[0].page_frame_num = (wasp::memory::PML4_PHYSICAL_ADDRESS / USN_PAGE_SIZE) + 1;
 
   //
   // Build a valid user-mode 1GB PDPTE
   //
-  mobo::memory::page_entry_t pte_template = {
+  wasp::memory::page_entry_t pte_template = {
       .present = 1,
       .write = 1,
       .allow_user_mode = 1,
@@ -483,7 +483,7 @@ uint64_t hyperv_machine::setup_long_paging(WHV_PARTITION_HANDLE handle)
     // Set the PDPTE to the next valid 1GB of RAM, creating a 1:1 map
     //
     pml3[i] = pte_template;
-    pml3[i].page_frame_num = ((i * mobo::memory::_1GB) / USN_PAGE_SIZE);
+    pml3[i].page_frame_num = ((i * wasp::memory::_1GB) / USN_PAGE_SIZE);
   }
 
   return phys_addr;
@@ -494,7 +494,7 @@ static machine::ptr hyperv_allocate() {
 }
 
 __register_platform(__hyperv__reg__)
-mobo::platform::registration __hyperv__reg__ = {
+wasp::platform::registration __hyperv__reg__ = {
     .name = "Microsoft Hyper-V",
     .flags = PLATFORM_WINDOWS,
     .allocate = hyperv_allocate,

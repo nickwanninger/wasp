@@ -1,6 +1,6 @@
 #pragma once
 
-namespace mobo {
+namespace wasp {
 
 namespace memory {
 

@@ -1,7 +1,7 @@
 #ifndef __PCI_H__
 #define __PCI_H__
 
-#include <mobo/types.h>
+#include <wasp/types.h>
 
 typedef enum {
   PCI_BAR_IO,

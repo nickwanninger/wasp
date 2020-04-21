@@ -1,13 +1,13 @@
 #include <string>
 
-#include "compiler_defs.h"
-#include "mobo/loader.h"
+#include <wasp/compiler_defs.h>
+#include <wasp/loader.h>
 
-namespace mobo::loader {
+namespace wasp::loader {
 
 flatbin_loader::flatbin_loader(std::string path) : path(std::move(path)) {}
 
-bool flatbin_loader::inject(mobo::machine &vm) {
+bool flatbin_loader::inject(wasp::machine &vm) {
   auto entry = 0x1000;
   vm.set_entry(entry);
 

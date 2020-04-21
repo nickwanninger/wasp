@@ -3,11 +3,11 @@
 #include <string>
 #include <chrono>
 #include <cstdio>
-#include <mobo/unistd.h>
+#include <wasp/unistd.h>
 
 #include "machine.h"
 
-namespace mobo {
+namespace wasp {
 
 template <class W, class L>
 bool run(

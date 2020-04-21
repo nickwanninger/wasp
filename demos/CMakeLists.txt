@@ -15,4 +15,7 @@ add_subdirectory(boottime)
 add_subdirectory(double)
 add_subdirectory(fib)
 add_subdirectory(http_echo)
-add_subdirectory(hyperv)
+
+if (WIN32)
+    add_subdirectory(hyperv)
+endif()

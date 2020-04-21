@@ -3,7 +3,7 @@
 #ifndef __MOBO_MACHINE_
 #define __MOBO_MACHINE_
 
-#include <mobo/workload.h>
+#include <wasp/workload.h>
 #include <stdlib.h>
 
 #include <string>
@@ -11,7 +11,7 @@
 #include "./support.h"
 #include "./vcpu.h"
 
-namespace mobo {
+namespace wasp {
 
 namespace memory {
 
@@ -67,7 +67,7 @@ public:
   virtual void reset() = 0;
 
   virtual uint32_t num_cpus() = 0;
-  virtual mobo::vcpu &cpu(uint32_t) = 0;
+  virtual wasp::vcpu &cpu(uint32_t) = 0;
   inline uint64_t entry() { return entry_; }
   inline void set_entry(uint64_t entry) { entry_ = entry; }
 };
@@ -90,7 +90,7 @@ struct registration {
 
 }  // namespace platform
 
-}  // namespace mobo
+}  // namespace wasp
 
 #ifdef _MSC_VER
 
@@ -128,8 +128,8 @@ struct registration {
 #define IGNORE_UNUSED __attribute__((__used__))
 #define FORCE_EXPORT __attribute__((externally_visible))
 
-extern mobo::platform::registration __start_vm_platforms[];
-extern mobo::platform::registration __stop_vm_platforms[];
+extern wasp::platform::registration __start_vm_platforms[];
+extern wasp::platform::registration __stop_vm_platforms[];
 
 #define __register_platform \
   IGNORE_UNUSED FORCE_EXPORT __attribute__( \

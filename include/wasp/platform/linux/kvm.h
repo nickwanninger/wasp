@@ -9,9 +9,9 @@
 #include <string>
 #include <vector>
 
-#include <mobo/workload.h>
-#include <mobo/vcpu.h>
-#include <mobo/machine.h>
+#include <wasp/workload.h>
+#include <wasp/vcpu.h>
+#include <wasp/machine.h>
 
 /*
  * The hole includes VESA framebuffer and PCI memory.
@@ -22,9 +22,9 @@
 
 #define KVM_MMIO_START KVM_32BIT_GAP_START
 
-namespace mobo {
+namespace wasp {
 
-struct kvm_vcpu : public mobo::vcpu {
+struct kvm_vcpu : public wasp::vcpu {
   int cpufd = -1;
   int index;
 
@@ -62,7 +62,7 @@ struct ram_bank {
   size_t size;
 };
 
-class kvm_machine : public mobo::machine {
+class kvm_machine : public wasp::machine {
  private:
   void *mem;
   size_t memsize;
@@ -101,9 +101,9 @@ class kvm_machine : public mobo::machine {
 
 
   uint32_t num_cpus() override;
-  mobo::vcpu &cpu(uint32_t) override;
+  wasp::vcpu &cpu(uint32_t) override;
 };
 
-}  // namespace mobo
+}  // namespace wasp
 
 #endif

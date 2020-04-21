@@ -10,8 +10,8 @@
 #include <memory>
 #include <inttypes.h>
 
-#include "platform/windows/hyperv_machine.h"
-#include "mobo/memory.h"
+#include <wasp/platform/windows/hyperv_machine.h>
+#include <wasp/memory.h>
 
 void get_registers(
     WHV_PARTITION_HANDLE partition_handle,
@@ -375,7 +375,7 @@ uint64_t setup_long_paging(WHV_PARTITION_HANDLE handle)
       - PD index - page directory index (level 2)
    */
 
-  uint64_t PTE_SIZE = sizeof(struct mobo::memory::page_entry_t);
+  uint64_t PTE_SIZE = sizeof(struct wasp::memory::page_entry_t);
 
   uint64_t USN_PAGE_SIZE = 0x1000;
   uint64_t NUM_LVL3_ENTRIES = 1;
@@ -387,14 +387,14 @@ uint64_t setup_long_paging(WHV_PARTITION_HANDLE handle)
 
   void *pte_ptr = allocate_guest_phys_memory(
       handle,
-      mobo::memory::PML4_PHYSICAL_ADDRESS,
+      wasp::memory::PML4_PHYSICAL_ADDRESS,
       ALL_PAGE_TABLES_SIZE);
   if (pte_ptr == nullptr) {
     throw std::runtime_error("allocate_guest_phys_memory: failed to allocate page table in guest");
   }
 
-  auto pml4 = static_cast<mobo::memory::page_entry_t *>(pte_ptr);
-  auto pml3 = static_cast<mobo::memory::page_entry_t *>((void *)((char *) pte_ptr + PML4_SIZE));
+  auto pml4 = static_cast<wasp::memory::page_entry_t *>(pte_ptr);
+  auto pml3 = static_cast<wasp::memory::page_entry_t *>((void *)((char *) pte_ptr + PML4_SIZE));
 
   //
   // Build a valid user-mode PML4E
@@ -403,12 +403,12 @@ uint64_t setup_long_paging(WHV_PARTITION_HANDLE handle)
   pml4[0].present = 1;
   pml4[0].write = 1;
   pml4[0].allow_user_mode = 1;
-  pml4[0].page_frame_num = (mobo::memory::PML4_PHYSICAL_ADDRESS / USN_PAGE_SIZE) + 1;
+  pml4[0].page_frame_num = (wasp::memory::PML4_PHYSICAL_ADDRESS / USN_PAGE_SIZE) + 1;
 
   //
   // Build a valid user-mode 1GB PDPTE
   //
-  mobo::memory::page_entry_t pte_template = {
+  wasp::memory::page_entry_t pte_template = {
       .present = 1,
       .write = 1,
       .allow_user_mode = 1,
@@ -424,10 +424,10 @@ uint64_t setup_long_paging(WHV_PARTITION_HANDLE handle)
     // Set the PDPTE to the next valid 1GB of RAM, creating a 1:1 map
     //
     pml3[i] = pte_template;
-    pml3[i].page_frame_num = ((i * mobo::memory::_1GB) / USN_PAGE_SIZE);
+    pml3[i].page_frame_num = ((i * wasp::memory::_1GB) / USN_PAGE_SIZE);
   }
 
-  return mobo::memory::PML4_PHYSICAL_ADDRESS;
+  return wasp::memory::PML4_PHYSICAL_ADDRESS;
 }
 
 int main() {
@@ -585,7 +585,7 @@ int main() {
 
   WHV_RUN_VP_EXIT_REASON exit_reason = context.ExitReason;
   printf("exit reason -> %d (%s); rip = 0x%llx; rax = 0x%llx\n",
-         exit_reason, mobo::hyperv_exit_reason_str(exit_reason), context.VpContext.Rip, r[rax].Reg64);
+         exit_reason, wasp::hyperv_exit_reason_str(exit_reason), context.VpContext.Rip, r[rax].Reg64);
 
   printf("================= (2) EXIT CONTEXT =================== \n");
   dump_state(stdout, handle, 0);

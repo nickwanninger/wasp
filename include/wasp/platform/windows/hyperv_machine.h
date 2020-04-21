@@ -1,14 +1,14 @@
 #pragma once
 
 #include <WinHvPlatformDefs.h>
-#include "mobo/machine.h"
+#include <wasp/machine.h>
 #include "./hyperv_vcpu.h"
 
-namespace mobo {
+namespace wasp {
 
 const char *hyperv_exit_reason_str(WHV_RUN_VP_EXIT_REASON reason);
 
-class hyperv_machine : public mobo::machine {
+class hyperv_machine : public wasp::machine {
 
 private:
   WHV_PARTITION_HANDLE handle_;
@@ -54,7 +54,7 @@ public:
   void *gpa2hpa(off_t gpa) override;
   void reset() override;
   uint32_t num_cpus() override;
-  mobo::vcpu &cpu(uint32_t) override;
+  wasp::vcpu &cpu(uint32_t) override;
 
   uint64_t setup_long_paging(WHV_PARTITION_HANDLE handle);
 };

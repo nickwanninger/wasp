@@ -4,7 +4,7 @@ double_workload::double_workload() : val(20) { }
 
 double_workload::~double_workload() = default;
 
-int double_workload::handle_hcall(struct mobo::regs_t &regs, size_t ramsize,
+int double_workload::handle_hcall(struct wasp::regs_t &regs, size_t ramsize,
                                   void *ram) {
   if (regs.rax == 0) {
 //      printf("%s: rax = 0\n", __FUNCTION__);

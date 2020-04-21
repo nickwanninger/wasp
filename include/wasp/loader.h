@@ -3,14 +3,14 @@
 #include "elfio/elfio.hpp"
 #include "./machine.h"
 
-namespace mobo::loader {
+namespace wasp::loader {
 
 class binary_loader {
 public:
   binary_loader() = default;
   virtual ~binary_loader() = default;
 
-  virtual bool inject(mobo::machine &vm) = 0;
+  virtual bool inject(wasp::machine &vm) = 0;
 };
 
 
@@ -19,7 +19,7 @@ class elf_loader : public binary_loader {
 
 public:
   elf_loader(std::string path);
-  bool inject(mobo::machine &vm) override;
+  bool inject(wasp::machine &vm) override;
 };
 
 class flatbin_loader : public binary_loader {
@@ -27,7 +27,7 @@ class flatbin_loader : public binary_loader {
 
 public:
   explicit flatbin_loader(std::string path);
-  bool inject(mobo::machine &vm) override;
+  bool inject(wasp::machine &vm) override;
 };
 
 }

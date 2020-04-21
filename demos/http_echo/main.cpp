@@ -9,14 +9,14 @@
 #include <queue>
 #include <thread>
 #include <utility>
-#include <mobo/runner.hpp>
+#include <wasp/runner.hpp>
 
 #include <timeit.h>
-#include <compiler_defs.h>
-#include <mobo/workload.h>
-#include <mobo/getopt.h>
-#include <mobo/platform.h>
-#include <mobo/unistd.h>
+#include <wasp/compiler_defs.h>
+#include <wasp/workload.h>
+#include <wasp/getopt.h>
+#include <wasp/platform.h>
+#include <wasp/unistd.h>
 
 #include "tcp_workload.h"
 
@@ -25,7 +25,7 @@
 #define PORT 7777
 #define BACKLOG 1000 /* how many pending connections queue will hold */
 
-using namespace mobo;
+using namespace wasp;
 
 TIMEIT_START(g_main);
 
@@ -35,11 +35,11 @@ std::atomic<int> nhcalls = 0;
 std::mutex dirty_lock;
 std::mutex clean_lock;
 std::mutex create_lock;
-std::queue<mobo::machine::ptr> clean;
-std::queue<mobo::machine::ptr> dirty;
+std::queue<wasp::machine::ptr> clean;
+std::queue<wasp::machine::ptr> dirty;
 std::condition_variable dirty_signal;
 
-static void add_dirty(mobo::machine::ptr v) {
+static void add_dirty(wasp::machine::ptr v) {
   dirty_lock.lock();
   dirty.push(v);
   dirty_lock.unlock();
@@ -47,7 +47,7 @@ static void add_dirty(mobo::machine::ptr v) {
 }
 
 template <class L>
-static std::shared_ptr<mobo::machine> get_clean(
+static std::shared_ptr<wasp::machine> get_clean(
     const std::string &path, size_t memsize)
 {
   TIMEIT_FN(g_main);
@@ -77,7 +77,7 @@ auto cleaner(void) {
     dirty_signal.wait(lk);
     // grab something to clean
     //
-    mobo::machine::ptr v;
+    wasp::machine::ptr v;
 
     if (!dirty.empty()) {
       v = dirty.front();
@@ -300,7 +300,7 @@ int test_throughput_2(const std::string& path, int nrunners) {
 int main(int argc, char **argv)
 {
 //  if (argc <= 1) {
-//    fprintf(stderr, "usage: mobo [kernel.elf]\n");
+//    fprintf(stderr, "usage: wasp [kernel.elf]\n");
 //    return -1;
 //  }
 

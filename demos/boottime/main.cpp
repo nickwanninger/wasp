@@ -1,11 +1,11 @@
-#include <mobo/runner.hpp>
-#include <mobo/loader.h>
+#include <wasp/runner.hpp>
+#include <wasp/loader.h>
 
 #include "./workload.h"
 
 int main()
 {
-  bool did_succeed = mobo::run<boottime_workload, mobo::loader::elf_loader>(
+  bool did_succeed = wasp::run<boottime_workload, wasp::loader::elf_loader>(
       "build/tests/boottime.elf",
       1);
 

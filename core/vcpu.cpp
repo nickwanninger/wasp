@@ -1,8 +1,8 @@
 #include <inttypes.h>  // PRIx64
-#include <mobo/machine.h>
-#include <mobo/vcpu.h>
+#include <wasp/machine.h>
+#include <wasp/vcpu.h>
 
-using namespace mobo;
+using namespace wasp;
 
 std::string vcpu::read_string(u64 gva) {
   std::string str;
@@ -35,7 +35,7 @@ int vcpu::read_guest(u64 gva, void *buf, size_t len) {
 }
 
 static void cpu_dump_seg_cache(FILE *out, const char *name,
-                               mobo::segment_t const &seg) {
+                               wasp::segment_t const &seg) {
   fprintf(out,        "%-3s=%04x %016" PRIx64 " %08x %d %02x   %1x   %d   %d     %d     %d    %d\n",
           name,
           seg.selector,
@@ -52,8 +52,8 @@ static void cpu_dump_seg_cache(FILE *out, const char *name,
 }
 
 void vcpu::dump_state(FILE *out) {
-  mobo::regs_t regs = {};
-  mobo::regs_special_t s = {};
+  wasp::regs_t regs = {};
+  wasp::regs_special_t s = {};
   read_regs_into(regs);
   read_regs_special_into(s);
 
@@ -93,11 +93,11 @@ void vcpu::dump_state(FILE *out) {
   cpu_dump_seg_cache(out, "LDT", s.ldt);
   cpu_dump_seg_cache(out, "TR", s.tr);
 
-  mobo::dtable_t &gdt_register = s.gdt;
+  wasp::dtable_t &gdt_register = s.gdt;
   fprintf(out, "GDT=     %016" PRIx64 " %08x\n", (size_t)gdt_register.base,
           (int) gdt_register.limit);
 
-  mobo::dtable_t &idt_register = s.idt;
+  wasp::dtable_t &idt_register = s.idt;
   fprintf(out, "IDT=     %016" PRIx64 " %08x\n", (size_t)idt_register.base,
           (int) idt_register.limit);
 

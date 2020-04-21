@@ -1,12 +1,12 @@
 #pragma once
 
-#include <mobo/workload.h>
+#include <wasp/workload.h>
 
-class double_workload : public mobo::workload {
+class double_workload : public wasp::workload {
   int val;
 
 public:
   double_workload();
   ~double_workload() override;
-  int handle_hcall(struct mobo::regs_t &regs, size_t ramsize, void *ram) override;
+  int handle_hcall(struct wasp::regs_t &regs, size_t ramsize, void *ram) override;
 };

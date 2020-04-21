@@ -18,7 +18,7 @@ ASOURCES:=$(filter %.asm,$(CODEFILES))
 AOBJECTS:=$(ASOURCES:%.asm=build/%.asm.o)
 
 
-FINAL_BIN = build/mobo
+FINAL_BIN = build/wasp
 
 
 CINCLUDES=-I./include/

@@ -1,11 +1,11 @@
 #pragma once
-#include <mobo/vcpu.h>
-#include <mobo/machine.h>
+#include <wasp/vcpu.h>
+#include <wasp/machine.h>
 #include <WinHvPlatformDefs.h>
 
-namespace mobo {
+namespace wasp {
 
-class hyperv_vcpu : public mobo::vcpu {
+class hyperv_vcpu : public wasp::vcpu {
 
   WHV_PARTITION_HANDLE partition_handle_;
   uint32_t cpu_index_;
@@ -22,14 +22,14 @@ public:
   ~hyperv_vcpu();
 
   // GPR
-  void read_regs_into(mobo::regs_t &r) override;
-  void write_regs(mobo::regs_t &) override;
+  void read_regs_into(wasp::regs_t &r) override;
+  void write_regs(wasp::regs_t &) override;
   // SPR
-  void read_regs_special_into(mobo::regs_special_t &r) override;
-  void write_regs_special(mobo::regs_special_t &r) override;
+  void read_regs_special_into(wasp::regs_special_t &r) override;
+  void write_regs_special(wasp::regs_special_t &r) override;
   // FPR
-  void read_regs_fpu_into(mobo::regs_fpu_t &) override;
-  void write_regs_fpu(mobo::regs_fpu_t &) override;
+  void read_regs_fpu_into(wasp::regs_fpu_t &) override;
+  void write_regs_fpu(wasp::regs_fpu_t &) override;
 
   void *translate_address(u64 gva) override;
   void reset() override;

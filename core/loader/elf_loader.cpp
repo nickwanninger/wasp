@@ -1,10 +1,10 @@
-#include "compiler_defs.h"
+#include <wasp/compiler_defs.h>
 
 #include <elfio/elfio.hpp>
-#include "mobo/platform.h"
-#include "mobo/loader.h"
+#include <wasp/platform.h>
+#include <wasp/loader.h>
 
-namespace mobo::loader {
+namespace wasp::loader {
 
 elf_loader::elf_loader(std::string path) {
   if (!reader.load(path)) {
@@ -12,7 +12,7 @@ elf_loader::elf_loader(std::string path) {
   }
 }
 
-bool elf_loader::inject(mobo::machine &vm) {
+bool elf_loader::inject(wasp::machine &vm) {
   fprintf(stderr, "%s\n", __FUNCTION__);
   auto entry = reader.get_entry();
   vm.set_entry(entry);
