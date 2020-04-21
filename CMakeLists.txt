@@ -83,6 +83,6 @@ endmacro()
 
 ###
 
-add_subdirectory(src)
+add_subdirectory(core)
 add_subdirectory(platform)
 add_subdirectory(demos)

@@ -33,8 +33,8 @@ if (MSVC)
     target_sources(hyperv_demo
             PRIVATE
             hyperv_demo.cpp
-            ../../src/vcpu.cpp
-            ../../src/machine.cpp
+            ../../core/vcpu.cpp
+            ../../core/machine.cpp
             ../../platform/windows/hyperv_machine.cpp
             ../../platform/windows/hyperv_vcpu.cpp
             )
