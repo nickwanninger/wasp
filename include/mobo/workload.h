@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vcpu.h"
+#include "./vcpu.h"
 
 // results for the workloads
 //

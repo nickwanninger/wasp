@@ -8,8 +8,8 @@
 
 #include <string>
 
-#include "platform/support.h"
-#include "vcpu.h"
+#include "./support.h"
+#include "./vcpu.h"
 
 namespace mobo {
 
@@ -108,19 +108,31 @@ struct registration {
 #pragma section("vm_platforms$u", read)
 #pragma section("vm_platforms$z", read)
 
-#define __register_platform                \
+/*
+ * Force the linker to include the definition
+ * see also https://stackoverflow.com/a/2993476/809572
+ */
+#ifdef _WIN64
+  #define FORCE_EXPORT(x) __pragma(comment (linker, "/export:" #x))
+#else
+  #define FORCE_EXPORT(x) __pragma(comment (linker, "/export:_" #x))
+#endif
+
+#define __register_platform(NAME) \
+   FORCE_EXPORT(NAME) extern "C" \
    __declspec(allocate("vm_platforms$u")) \
    IGNORE_UNUSED __declspec(align(sizeof(void *)))
 
 #else
 
 #define IGNORE_UNUSED __attribute__((__used__))
+#define FORCE_EXPORT __attribute__((externally_visible))
 
 extern mobo::platform::registration __start_vm_platforms[];
 extern mobo::platform::registration __stop_vm_platforms[];
 
-#define __register_platform                \
-  IGNORE_UNUSED __attribute__( \
+#define __register_platform \
+  IGNORE_UNUSED FORCE_EXPORT __attribute__( \
       (unused, __section__("vm_platforms"), aligned(sizeof(void *))))
 
 #endif

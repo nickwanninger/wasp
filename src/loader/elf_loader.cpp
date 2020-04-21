@@ -1,12 +1,16 @@
 #include "compiler_defs.h"
 
 #include <elfio/elfio.hpp>
-#include "platform/platform.h"
-#include "platform/loader.h"
+#include "mobo/platform.h"
+#include "mobo/loader.h"
 
 namespace mobo::loader {
 
-elf_loader::elf_loader(std::string path) { reader.load(path); }
+elf_loader::elf_loader(std::string path) {
+  if (!reader.load(path)) {
+    PANIC("failed to open ELF binary: '%s'", path.data());
+  }
+}
 
 bool elf_loader::inject(mobo::machine &vm) {
   fprintf(stderr, "%s\n", __FUNCTION__);

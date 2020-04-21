@@ -11,6 +11,7 @@ mobo::machine::~machine(void) = default;
 machine::ptr machine::create(size_t memsize)
 {
   machine::ptr v = platform::create(PLATFORM_ANY);
+  if (v == nullptr) { return v; }
   v->allocate_ram(memsize);
   v->reset();
   return v;

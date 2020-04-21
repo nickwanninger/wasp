@@ -8,7 +8,7 @@
 #include <memory>
 #include <stdexcept>
 
-#include <mobo/types.h>
+#include "./types.h"
 
 
 /* eflags masks */

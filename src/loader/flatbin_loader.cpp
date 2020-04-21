@@ -1,7 +1,7 @@
 #include <string>
 
 #include "compiler_defs.h"
-#include "platform/loader.h"
+#include "mobo/loader.h"
 
 namespace mobo::loader {
 

@@ -11,8 +11,8 @@
 
 #define PANIC(msg, ...) \
     do { \
-        fprintf(stderr, "panic! (tid %d) [%s] %s:L%d: " msg "\n", \
-                std::this_thread::get_id(), \
+        fprintf(stderr, "panic! (tid %ld) [%s] %s:L%d: " msg "\n", \
+                GetCurrentThreadId(), \
                 __FILE__,  \
                 __FUNCTION__, \
                 __LINE__, \
