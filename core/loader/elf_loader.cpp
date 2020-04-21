@@ -48,13 +48,13 @@ bool elf_loader::inject(wasp::machine &vm) {
     }
   }
 
-  struct regs_t r;
+  regs_t r;
   vm.cpu(0).read_regs_into(r);
   r.rip = entry;
   vm.cpu(0).write_regs(r);
 
   // XXX: should we do this?
-  struct regs_special_t sr;
+  regs_special_t sr;
   vm.cpu(0).read_regs_special_into(sr);
   sr.cs.base = 0;
   sr.ds.base = 0;

@@ -28,7 +28,7 @@ bool flatbin_loader::inject(wasp::machine &vm) {
   fread(addr, sz, 1, fp);
   fclose(fp);
 
-  struct regs_t r = {};
+  regs_t r = {};
   vm.cpu(0).read_regs_into(r);
   r.rip = entry;
   r.rsp = 0x1000;

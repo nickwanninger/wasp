@@ -16,7 +16,7 @@ class workload {
 
     workload() = default;
     virtual int handle_hcall(
-            struct wasp::regs_t &regs,
+            wasp::regs_t &regs,
             size_t ramsize,
             void *ram) = 0;
     virtual void handle_exit() {};

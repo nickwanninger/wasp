@@ -84,5 +84,6 @@ endmacro()
 ###
 
 add_subdirectory(core)
+add_subdirectory(core_wrapper)
 add_subdirectory(platform)
 add_subdirectory(demos)
