@@ -11,7 +11,7 @@ add_library(${LIBRARY_NAME} STATIC "")
 target_include_directories(${LIBRARY_NAME}
         PUBLIC ../../include)
 
-wasp_target_set_cxx_standard(${LIBRARY_NAME})
+wasp_target_set_lang_standard(${LIBRARY_NAME})
 
 target_sources(${LIBRARY_NAME}
         PRIVATE

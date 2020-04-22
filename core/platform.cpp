@@ -19,7 +19,7 @@ const wasp::platform::registration *const __stop_vm_platforms = reinterpret_cast
 
 #endif
 
-wasp::machine::ptr wasp::platform::create(int flags) {
+wasp::machine::unique_ptr wasp::platform::create(int flags) {
 
   for (auto *plat = __start_vm_platforms; plat < __stop_vm_platforms; plat++) {
     if ((plat->flags & flags) != 0) {

@@ -8,9 +8,9 @@ using namespace wasp;
 
 wasp::machine::~machine(void) = default;
 
-machine::ptr machine::create(size_t memsize)
+machine::unique_ptr machine::create(size_t memsize)
 {
-  machine::ptr v = platform::create(PLATFORM_ANY);
+  machine::unique_ptr v = platform::create(PLATFORM_ANY);
   if (v == nullptr) { return v; }
   v->allocate_ram(memsize);
   v->reset();

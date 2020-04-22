@@ -35,19 +35,19 @@ std::atomic<int> nhcalls = 0;
 std::mutex dirty_lock;
 std::mutex clean_lock;
 std::mutex create_lock;
-std::queue<wasp::machine::ptr> clean;
-std::queue<wasp::machine::ptr> dirty;
+std::queue<wasp::machine::shared_ptr> clean;
+std::queue<wasp::machine::shared_ptr> dirty;
 std::condition_variable dirty_signal;
 
-static void add_dirty(wasp::machine::ptr v) {
+static void add_dirty(wasp::machine::unique_ptr v) {
   dirty_lock.lock();
-  dirty.push(v);
+  dirty.push(std::move(v));
   dirty_lock.unlock();
   dirty_signal.notify_one();
 }
 
 template <class L>
-static std::shared_ptr<wasp::machine> get_clean(
+static wasp::machine::shared_ptr get_clean(
     const std::string &path, size_t memsize)
 {
   TIMEIT_FN(g_main);
@@ -55,7 +55,7 @@ static std::shared_ptr<wasp::machine> get_clean(
   {
     std::scoped_lock lck(clean_lock);
     if (!clean.empty()) {
-      auto v = clean.front();
+      auto v = std::move(clean.front());
       clean.pop();
       return v;
     }
@@ -64,7 +64,7 @@ static std::shared_ptr<wasp::machine> get_clean(
   {
     std::scoped_lock lock(create_lock);
     L loader(path);
-    machine::ptr v = machine::create(memsize);
+    machine::unique_ptr v = machine::create(memsize);
     loader.inject(*v);
     return v;
   }
@@ -77,10 +77,10 @@ auto cleaner(void) {
     dirty_signal.wait(lk);
     // grab something to clean
     //
-    wasp::machine::ptr v;
+    wasp::machine::shared_ptr v;
 
     if (!dirty.empty()) {
-      v = dirty.front();
+      v = std::move(dirty.front());
       dirty.pop();
     }
     lk.unlock();

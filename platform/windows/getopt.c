@@ -1,4 +1,4 @@
-#include <wasp/platform/windows/getopt.h>
+#include <wasp_c/platform/windows/getopt.h>
 
 /*
 * Copyright (c) 1987, 1993, 1994

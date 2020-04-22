@@ -489,8 +489,8 @@ uint64_t hyperv_machine::setup_long_paging(WHV_PARTITION_HANDLE handle)
   return phys_addr;
 }
 
-static machine::ptr hyperv_allocate() {
-  return std::make_shared<hyperv_machine>(1);
+static machine::unique_ptr hyperv_allocate() {
+  return std::make_unique<hyperv_machine>(1);
 }
 
 __register_platform(__hyperv__reg__)

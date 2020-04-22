@@ -4,7 +4,6 @@
 #define __MOBO_PLATFORM__
 
 #include <cstdint>
-#include "./support.h"
 #include "./memory.h"
 #include "./socket.h"
 #include "./backend.h"

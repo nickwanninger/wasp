@@ -4,16 +4,20 @@
 extern "C" {
 #endif
 
-typedef struct wasp_regs_t wasp_regs_t;
+#include "vcpu_regs.h"
+#include "workload_defs.h"
 
-typedef void (*wasp_workload_init_fn_t)();
-typedef int (*wasp_workload_handle_hcall_fn_t)(wasp_regs_t *regs, size_t ramsize, void *ram);
-typedef void (*wasp_workload_handle_exit_fn_t)();
+struct wasp_workload_t;
+
+typedef void (*wasp_workload_init_fn)(struct wasp_workload_t *self, void *config);
+typedef int (*wasp_workload_handle_hcall_fn)(struct wasp_workload_t *self, struct wasp_regs_t *regs, size_t ramsize, void *ram);
+typedef void (*wasp_workload_handle_exit_fn)(struct wasp_workload_t *self);
 
 typedef struct wasp_workload_t {
-  wasp_workload_init_fn_t init;
-  wasp_workload_handle_hcall_fn_t handle_hcall;
-  wasp_workload_handle_exit_fn_t handle_exit;
+  void *ctx;
+  wasp_workload_init_fn init;
+  wasp_workload_handle_hcall_fn handle_hcall;
+  wasp_workload_handle_exit_fn handle_exit;
 } wasp_workload_t;
 
 #ifdef __cplusplus

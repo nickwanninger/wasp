@@ -26,7 +26,7 @@ bool wasp_loader_inject(wasp_loader_t *self, wasp_machine_t *vm) {
   PANIC_IF_NULL(self);
   PANIC_IF_NULL(vm);
 
-  return self->instance->inject(*vm->instance);
+  return self->instance->inject(vm->container->get());
 }
 
 void wasp_loader_free(wasp_loader_t *self) {

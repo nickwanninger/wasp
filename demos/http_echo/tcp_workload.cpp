@@ -26,7 +26,7 @@ static bool send_all(int socket, void *buffer, size_t length) {
 
 tcp_workload::tcp_workload(zn_socket_t sock) : socket(sock) {}
 
-int tcp_workload::handle_hcall(struct wasp::regs_t &regs, size_t ramsize,
+int tcp_workload::handle_hcall(wasp::regs_t &regs, size_t ramsize,
                                void *ram) {
   TIMEIT_FN(g_main);
 

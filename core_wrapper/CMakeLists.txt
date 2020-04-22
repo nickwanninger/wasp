@@ -6,7 +6,7 @@ add_library(${PROJECT_NAME} STATIC "")
 target_include_directories(${PROJECT_NAME}
         PUBLIC ../include)
 
-wasp_target_set_cxx_standard(${PROJECT_NAME})
+wasp_target_set_lang_standard(${PROJECT_NAME})
 
 target_link_libraries(${PROJECT_NAME}
         PUBLIC

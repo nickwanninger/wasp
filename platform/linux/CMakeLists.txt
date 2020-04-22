@@ -6,7 +6,7 @@ if (NOT LINUX)
 endif()
 
 add_library(${PROJECT_NAME} STATIC "")
-wasp_target_set_cxx_standard(${PROJECT_NAME})
+wasp_target_set_lang_standard(${PROJECT_NAME})
 
 target_include_directories(${PROJECT_NAME}
         PUBLIC ../../include)

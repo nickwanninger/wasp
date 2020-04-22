@@ -13,7 +13,7 @@ target_include_directories(${LIBRARY_NAME}
 target_link_libraries(${LIBRARY_NAME}
         PRIVATE Threads::Threads)
 
-wasp_target_set_cxx_standard(${LIBRARY_NAME})
+wasp_target_set_lang_standard(${LIBRARY_NAME})
 
 target_sources(${LIBRARY_NAME}
         PRIVATE

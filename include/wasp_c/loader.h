@@ -12,6 +12,8 @@ typedef struct wasp_loader_t wasp_loader_t;
 bool wasp_loader_inject(wasp_loader_t *self, wasp_machine_t *vm);
 void wasp_loader_free(wasp_loader_t *self);
 
+typedef wasp_loader_t *(*wasp_loader_create_fn_t)(const char *path);
+
 wasp_loader_t *wasp_elf_loader_create(const char *path);
 wasp_loader_t *wasp_flatbin_loader_create(const char *path);
 

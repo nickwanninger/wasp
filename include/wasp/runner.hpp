@@ -41,7 +41,7 @@ bool run(
 
   // TODO: Use the RAM size from what you're loading or throw if the loader
   // requested memory size is greater than the limit
-  machine::ptr vm = machine::create(1 * 1024l * 1024l);
+  machine::unique_ptr vm = machine::create(1 * 1024l * 1024l);
   if (vm == nullptr) { return false; }
   for (int i = 0; i < run_count; i++) {
     W work;

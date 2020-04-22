@@ -3,12 +3,10 @@
 #ifndef __MOBO_MACHINE_
 #define __MOBO_MACHINE_
 
-#include <wasp/workload.h>
 #include <stdlib.h>
-
 #include <string>
 
-#include "./support.h"
+#include "./workload.h"
 #include "./vcpu.h"
 
 namespace wasp {
@@ -49,11 +47,12 @@ class machine {
   uint64_t entry_ = (uint64_t) -1;
 
 public:
-  typedef std::shared_ptr<machine> ptr;
+  typedef std::unique_ptr<machine> unique_ptr;
+  typedef std::shared_ptr<machine> shared_ptr;
 
   machine() = default;
   virtual ~machine();
-  static machine::ptr create(size_t memsize);
+  static machine::unique_ptr create(size_t memsize);
 
   template <typename T>
   inline auto val_at(off_t gpa) -> T& {
@@ -80,12 +79,12 @@ public:
 
 namespace platform {
 
-machine::ptr create(int platform);
+machine::unique_ptr create(int platform);
 
 struct registration {
   const char *name;
   uint32_t flags;
-  machine::ptr (*allocate)(void);
+  machine::unique_ptr (*allocate)(void);
 };
 
 }  // namespace platform

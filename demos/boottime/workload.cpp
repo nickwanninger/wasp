@@ -10,7 +10,7 @@ boottime_workload::boottime_workload(void) {
 
 boottime_workload::~boottime_workload(void) { printf("\n"); }
 
-int boottime_workload::handle_hcall(struct wasp::regs_t &regs, size_t ramsize,
+int boottime_workload::handle_hcall(wasp::regs_t &regs, size_t ramsize,
                                     void *ram) {
   if (regs.rax == 1) {
     auto *tsc = (uint64_t *) ram;
