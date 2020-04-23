@@ -43,26 +43,29 @@ function(wasp_target_set_lang_standard TARGET_NAME)
 
 endfunction()
 
-function(wasp_target_link_backend_library TARGET_NAME)
+function(wasp_target_link_backend_library TARGET_NAME LIBRARY_TYPE)
     # see also
     # > https://stackoverflow.com/a/42083877/809572
     # > https://cmake.org/cmake/help/latest/manual/cmake-generator-expressions.7.html
     # > https://cmake.org/cmake/help/latest/command/target_link_libraries.html#id2 (under "a link flag")
     #
+    if (NOT LIBRARY_TYPE)
+        set(LIBRARY_TYPE static)
+    endif()
 
     if (CMAKE_CXX_COMPILER_MSVC)
-        set(WASP_BACKEND_TARGET_NAME wasp_backend_windows)
-        target_link_libraries(${TARGET_NAME} PRIVATE -wholearchive:$<TARGET_LINKER_FILE:wasp_backend_windows>)
+        set(WASP_BACKEND_TARGET_NAME wasp_backend_windows_${LIBRARY_TYPE})
+        target_link_libraries(${TARGET_NAME} PRIVATE -wholearchive:$<TARGET_LINKER_FILE:${WASP_BACKEND_TARGET_NAME}>)
 
     elseif(LINUX)
-        set(WASP_BACKEND_TARGET_NAME wasp_backend_linux)
+        set(WASP_BACKEND_TARGET_NAME wasp_backend_linux_${LIBRARY_TYPE})
 
         if (CMAKE_CXX_COMPILER_GCC)
             # see also https://stackoverflow.com/a/50281571/809572
-            target_link_libraries(${TARGET_NAME} PRIVATE "-Wl,--whole-archive $<TARGET_LINKER_FILE:wasp_backend_linux> -Wl,--no-whole-archive")
+            target_link_libraries(${TARGET_NAME} PRIVATE "-Wl,--whole-archive $<TARGET_LINKER_FILE:${WASP_BACKEND_TARGET_NAME}> -Wl,--no-whole-archive")
 
         elseif (CMAKE_CXX_COMPILER_CLANG)
-            target_link_libraries(${TARGET_NAME} PRIVATE "-Wl,-force_load $<TARGET_LINKER_FILE:wasp_backend_linux>")
+            target_link_libraries(${TARGET_NAME} PRIVATE "-Wl,-force_load $<TARGET_LINKER_FILE:${WASP_BACKEND_TARGET_NAME}>")
 
         else()
             message(FATAL_ERROR "Unsupported Linux compiler '${CMAKE_CXX_COMPILER_ID}' while attempting to add WASP backend to ${TARGET_NAME}.")
@@ -78,14 +81,14 @@ function(wasp_target_link_backend_library TARGET_NAME)
 
 endfunction()
 
-function(wasp_target_link_libraries TARGET_NAME)
+function(wasp_target_link_libraries TARGET_NAME LIBRARY_TYPE)
     target_link_libraries(${TARGET_NAME} PRIVATE wasp)
     get_property(PROJECT_LANGUAGES GLOBAL PROPERTY ENABLED_LANGUAGES)
     if ("C" IN_LIST PROJECT_LANGUAGES)
         target_link_libraries(${TARGET_NAME} PRIVATE wasp_c)
     endif()
 
-    wasp_target_link_backend_library(${TARGET_NAME})
+    wasp_target_link_backend_library(${TARGET_NAME} ${LIBRARY_TYPE})
 endfunction()
 
 macro(wasp_get_dirname NAME)

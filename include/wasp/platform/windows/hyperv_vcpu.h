@@ -5,7 +5,7 @@
 
 namespace wasp {
 
-class hyperv_vcpu : public wasp::vcpu {
+class WASP_API hyperv_vcpu : public wasp::vcpu {
 
   WHV_PARTITION_HANDLE partition_handle_;
   uint32_t cpu_index_;

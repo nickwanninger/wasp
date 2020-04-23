@@ -5,7 +5,7 @@
 
 namespace wasp {
 
-class workload {
+class WASP_API workload {
   public:
 
     workload() = default;

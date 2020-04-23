@@ -43,7 +43,7 @@ static_assert(sizeof(struct page_entry_t) == sizeof(uint64_t), "expected 64-bit 
 
 class driver;
 
-class machine {
+class WASP_API machine {
   uint64_t entry_ = (uint64_t) -1;
 
 public:
@@ -79,7 +79,7 @@ public:
 
 namespace platform {
 
-machine::unique_ptr create(int platform);
+WASP_API machine::unique_ptr create(int platform);
 
 struct registration {
   const char *name;
@@ -107,20 +107,13 @@ struct registration {
 #pragma section("vm_platforms$u", read)
 #pragma section("vm_platforms$z", read)
 
-/*
- * Force the linker to include the definition
- * see also https://stackoverflow.com/a/2993476/809572
- */
-#ifdef _WIN64
-  #define FORCE_EXPORT(x) __pragma(comment (linker, "/export:" #x))
-#else
-  #define FORCE_EXPORT(x) __pragma(comment (linker, "/export:_" #x))
-#endif
 
 #define __register_platform(NAME) \
-   FORCE_EXPORT(NAME) extern "C" \
+   WASP_API \
+   extern "C" \
+   IGNORE_UNUSED \
    __declspec(allocate("vm_platforms$u")) \
-   IGNORE_UNUSED __declspec(align(sizeof(void *)))
+   __declspec(align(sizeof(void *)))
 
 #else
 
@@ -131,8 +124,13 @@ extern wasp::platform::registration __start_vm_platforms[];
 extern wasp::platform::registration __stop_vm_platforms[];
 
 #define __register_platform \
-  IGNORE_UNUSED FORCE_EXPORT __attribute__( \
-      (unused, __section__("vm_platforms"), aligned(sizeof(void *))))
+  WASP_API \
+  IGNORE_UNUSED \
+  __attribute__((\
+    unused, \
+    __section__("vm_platforms"), \
+    aligned(sizeof(void *)) \
+  ))
 
 #endif
 

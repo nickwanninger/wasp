@@ -6,16 +6,15 @@
 #include <cstdint>
 #include "./memory.h"
 #include "./socket.h"
-#include "./backend.h"
 #include "./loader.h"
 
-void
-zn_set_affinity(int cpu);
+WASP_API
+void zn_set_affinity(int cpu);
 
-int
-zn_get_processors_count();
+WASP_API
+int zn_get_processors_count();
 
-void
-zn_sleep_micros(uint32_t usecs);
+WASP_API
+void zn_sleep_micros(uint32_t usecs);
 
 #endif

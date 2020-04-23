@@ -5,7 +5,7 @@
 
 namespace wasp::loader {
 
-class binary_loader {
+class WASP_API binary_loader {
 public:
   binary_loader() = default;
   virtual ~binary_loader() = default;
@@ -14,7 +14,7 @@ public:
 };
 
 
-class elf_loader : public binary_loader {
+class WASP_API elf_loader : public binary_loader {
   ELFIO::elfio reader;
 
 public:
@@ -22,7 +22,7 @@ public:
   bool inject(wasp::machine &vm) override;
 };
 
-class flatbin_loader : public binary_loader {
+class WASP_API flatbin_loader : public binary_loader {
   std::string path;
 
 public:

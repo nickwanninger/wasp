@@ -8,6 +8,7 @@
 #include <memory>
 #include <stdexcept>
 
+#include "./compiler_defs.h"
 #include "./types.h"
 #include "./vcpu_regs.h"
 
@@ -44,7 +45,7 @@ using segment_t = struct ::wasp_segment_t;
 using dtable_t = struct ::wasp_dtable_t;
 
 // the vcpu struct is a general interface to a virtualized x86_64 CPU
-class vcpu {
+class WASP_API vcpu {
  public:
   typedef std::shared_ptr<vcpu> ptr;
 
@@ -72,7 +73,7 @@ class vcpu {
 };
 
 template <typename T>
-class guest_array {
+class WASP_API guest_array {
  private:
   u64 base = 0;
 

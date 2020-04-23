@@ -17,4 +17,3 @@ target_sources(${PROJECT_NAME}
         machine.cpp
         loader.cpp
         )
-

@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 
-function(wasp_target_configure_demo PROJECT_NAME)
+function(wasp_target_configure_demo PROJECT_NAME LIBRARY_TYPE)
     add_executable(${PROJECT_NAME} "")
     set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "${DEMO_NAME}")
     wasp_target_set_lang_standard(${PROJECT_NAME})
-    wasp_target_link_libraries(${PROJECT_NAME})
+    wasp_target_link_libraries(${PROJECT_NAME} ${LIBRARY_TYPE})
 
     target_compile_definitions(${PROJECT_NAME}
             PRIVATE

@@ -6,10 +6,9 @@
 
 namespace wasp {
 
-const char *hyperv_exit_reason_str(WHV_RUN_VP_EXIT_REASON reason);
+WASP_API const char *hyperv_exit_reason_str(WHV_RUN_VP_EXIT_REASON reason);
 
-class hyperv_machine : public wasp::machine {
-
+class WASP_API hyperv_machine : public wasp::machine {
 private:
   WHV_PARTITION_HANDLE handle_;
   std::vector<hyperv_vcpu> cpu_;
