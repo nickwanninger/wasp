@@ -1,0 +1,17 @@
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package]
+name = "wasp-sys"
+version = "0.1.0"
+authors = [
+    "Josh Bowden <josbow@gmail.com>",
+    "Nick Wanninger <nickwanninger@gmail.com>"
+]
+edition = "2018"
+
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.53.2"
+cfg-if = "0.1"
