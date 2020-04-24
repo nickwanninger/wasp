@@ -10,11 +10,11 @@ fn main() {
     println!("cargo:rustc-link-lib=static=wasp");
 
     cfg_if::cfg_if! {
-        if #[cfg(linux)] {
+        if #[cfg(target_os = "linux")] {
             println!("cargo:rustc-link-search=../build/platform/linux");
             println!("cargo:rustc-link-lib=static=wasp_backend_linux");
         }
-        else if #[cfg(windows)] {
+        else if #[cfg(target_os = "windows")] {
             println!("cargo:rustc-link-search=../build/platform/windows");
             println!("cargo:rustc-flags=link-args='-Wl,-force_load'");
             println!("cargo:rustc-link-lib=static=wasp_backend_windows");

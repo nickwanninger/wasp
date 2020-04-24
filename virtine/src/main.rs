@@ -1,5 +1,68 @@
+use proc_macro_hack;
+
+#[proc_macro_hack::proc_macro_hack]
+use wasp_proc_macros::nasm;
+
+use wasp_sys;
+
+extern crate capstone;
+use capstone::prelude::*;
 
 
+
+macro_rules! nasm_vm {
+    ($e:expr) => (VM {
+        code: nasm!($e)
+    });
+}
+
+
+fn main() {
+    let x = nasm!("
+        [bits 64]
+        mov rax, 1
+        syscall
+        ret
+    ");
+
+    let vm = nasm_vm!("
+        [bits 64]
+        mov rax, 2
+    ");
+
+    println!("vm: {:#?}", vm);
+
+
+
+    let cs = Capstone::new()
+        .x86()
+        .mode(arch::x86::ArchMode::Mode64)
+        .syntax(arch::x86::ArchSyntax::Intel)
+        .detail(true)
+        .build().expect("failed to build capstone");
+
+    let insns = cs.disasm_all(x, 0x1000).expect("failed to diasm");
+
+
+    println!("code: {:02x?}", x);
+
+    println!("asm:");
+    for i in insns.iter() {
+        println!("{}", i);
+
+    }
+
+}
+
+
+
+
+
+
+
+
+
+#[derive(Debug)]
 pub struct VM<'a> {
     code: &'a [u8]
 }
@@ -48,15 +111,5 @@ impl<'a> VM<'a> {
 
         Ok(output_buffer)
     }
-
-}
-
-fn main() {
-    let code: [u8; 32] = [0; 32];
-    let mut myvm = VM::new(&code);
-
-    let val = myvm.run::<i32, i32>(0).expect("ope");
-
-    println!("val: {}", val);
 
 }
