@@ -4,6 +4,7 @@
 
 #include <processthreadsapi.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define PANIC(msg, ...) \
     do { \

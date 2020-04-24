@@ -37,11 +37,11 @@
 
 namespace wasp {
 
-using regs_t = struct ::wasp_regs_t;
-using regs_special_t = struct ::wasp_regs_special_t;
-using regs_fpu_t = struct ::wasp_regs_fpu_t;
-using segment_t = struct ::wasp_segment_t;
-using dtable_t = struct ::wasp_dtable_t;
+using regs_t = ::wasp_regs_t;
+using regs_special_t = ::wasp_regs_special_t;
+using regs_fpu_t = ::wasp_regs_fpu_t;
+using segment_t = ::wasp_segment_t;
+using dtable_t = ::wasp_dtable_t;
 
 // the vcpu struct is a general interface to a virtualized x86_64 CPU
 class vcpu {

@@ -1,7 +1,7 @@
 #include <malloc.h>
 #include <wasp_c/workload.h>
 #include <wasp_c/panic.h>
-
+#include <stdlib.h>
 #include "workload.h"
 
 struct double_workload_ctx_t {
