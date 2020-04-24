@@ -5,10 +5,17 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    // Tell cargo to link the wasp shared libraries.
-    println!("cargo:rustc-link-search=../build/core/");
-    println!("cargo:rustc-link-lib=static=wasp");
 
+
+    let mut s = String::new();
+
+    s.push_str("cargo:rustc-flags=-lwasp -lwasp_c -L../build/core -L../build/core_wrapper");
+
+    s.push_str(" -lwasp_backend_linux -L../build/platform/linux");
+
+    println!("{}", s);
+
+    /*
     cfg_if::cfg_if! {
         if #[cfg(target_os = "linux")] {
             println!("cargo:rustc-link-search=../build/platform/linux");
@@ -23,6 +30,7 @@ fn main() {
             panic!("unsupported wasp backend platform");
         }
     }
+    */
 
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for

@@ -3,11 +3,10 @@ use proc_macro_hack;
 #[proc_macro_hack::proc_macro_hack]
 use wasp_proc_macros::nasm;
 
-pub use wasp_sys;
-
 extern crate capstone;
 use capstone::prelude::*;
 
+pub mod machine;
 
 
 macro_rules! nasm_vm {
@@ -44,7 +43,7 @@ fn main() {
     let insns = cs.disasm_all(x, 0x1000).expect("failed to diasm");
 
 
-    let myvm = wasp_sys::Machine::new(4096 * 10);
+    let myvm = machine::Machine::new(4096 * 10);
 
 
     println!("code: {:02x?}", x);

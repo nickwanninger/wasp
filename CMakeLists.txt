@@ -82,7 +82,7 @@ function(wasp_target_link_libraries TARGET_NAME)
     target_link_libraries(${TARGET_NAME} PRIVATE wasp)
     get_property(PROJECT_LANGUAGES GLOBAL PROPERTY ENABLED_LANGUAGES)
     if ("C" IN_LIST PROJECT_LANGUAGES)
-        target_link_libraries(${TARGET_NAME} PRIVATE wasp_c)
+			# target_link_libraries(${TARGET_NAME} PRIVATE wasp_c)
     endif()
 
     wasp_target_link_backend_library(${TARGET_NAME})
@@ -97,6 +97,6 @@ endmacro()
 ###
 
 add_subdirectory(core)
-add_subdirectory(core_wrapper)
+# add_subdirectory(core_wrapper)
 add_subdirectory(platform)
 add_subdirectory(demos)

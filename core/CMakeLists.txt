@@ -24,5 +24,8 @@ target_sources(${LIBRARY_NAME}
 
         loader/elf_loader.cpp
         loader/flatbin_loader.cpp
+
+				c_wrapper/loader.cpp
+				c_wrapper/machine.cpp
         )
 
