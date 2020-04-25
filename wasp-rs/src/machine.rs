@@ -5,11 +5,8 @@
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 
-use threadpool::ThreadPool;
-use std::collections::VecDeque;
-
-
-
+use std::sync::{Mutex, Arc};
+use std::collections::{VecDeque};
 
 pub enum ExitType {
     Okay, Kill
@@ -176,43 +173,56 @@ unsafe extern "C" fn workload_exit(_self_: *mut wasp_workload_t) {
 
 
 
+
+
+
 /// Implements pooling
 pub struct MachinePool<'a, T> {
-    tpool: ThreadPool,
+    avail: Mutex<VecDeque<Machine<'a>>>,
     ramsize: usize,
     code: &'a [u8],
-    cb: Box<dyn Fn(&mut HyperCall, T) -> ExitType + 'static>
+    cb: Arc<dyn Fn(&mut HyperCall, T) -> ExitType + 'static>
 }
 
 
 impl<'a, T: Copy> MachinePool<'a, T> {
     pub fn new(
-        poolsize: usize,
         ramsize: usize,
         code: &'a [u8],
         f: impl Fn(&mut HyperCall, T) -> ExitType + 'static,
     ) -> Self {
         MachinePool {
-            tpool: ThreadPool::new(poolsize),
+            avail: Mutex::new(VecDeque::new()),
             ramsize,
             code,
-            cb: Box::new(f)
+            cb: Arc::new(f)
+        }
+    }
+
+    fn get_vm(&mut self) -> Machine<'a> {
+        let mut a = self.avail.lock().unwrap();
+
+        if a.is_empty() {
+            Machine::new(self.ramsize as u64, self.code)
+        } else {
+            a.pop_front().expect("hey, std::sync::Mutex lied to us. Not cool!")
         }
     }
 
 
     /// run a vm with an "argument value" `val`
     pub fn fire(&mut self, val: T) {
-        let mut m = Machine::new(self.ramsize as u64, self.code);
+        let mut m = self.get_vm();
         m.run(|hc| {
             (self.cb)(hc, val)
         });
+        self.avail.lock().unwrap().push_back(m);
     }
 }
 
 
 impl<'a, T> Drop for MachinePool<'a, T> {
     fn drop(&mut self) {
-        self.tpool.join();
+        // self.tpool.join();
     }
 }

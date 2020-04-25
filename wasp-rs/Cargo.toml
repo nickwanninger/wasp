@@ -14,7 +14,7 @@ edition = "2018"
 wasp-proc-macros = { path = "./wasp-proc-macros" }
 proc-macro-hack = "0.5"
 capstone = "0.7.0"
-threadpool = "1.8.0"
+workerpool = "1.2.0"
 
 [build-dependencies]
 bindgen = "0.53.2"
