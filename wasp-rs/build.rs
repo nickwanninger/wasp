@@ -6,14 +6,8 @@ use std::path::PathBuf;
 
 fn main() {
 
-
-    let mut s = String::new();
-
-    s.push_str("cargo:rustc-flags=-lwasp -lwasp_c -L../build/core -L../build/core_wrapper");
-
-    s.push_str(" -lwasp_backend_linux -L../build/platform/linux");
-
-    println!("{}", s);
+    println!("cargo:rustc-flags=-lwasp -L../build/wasp");
+    println!("cargo:rustc-flags=-lstdc++");
 
     /*
     cfg_if::cfg_if! {

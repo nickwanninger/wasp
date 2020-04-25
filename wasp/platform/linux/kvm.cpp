@@ -578,14 +578,9 @@ void *kvm_vcpu::translate_address(u64 gva) {
 
 static int kvmfd = -1;
 
-static machine::unique_ptr kvm_allocate(void) {
+machine::unique_ptr platform::create(void) {
+	
   if (kvmfd == -1) kvmfd = open("/dev/kvm", O_RDWR);
 
   return std::make_unique<kvm_machine>(kvmfd, 1);
 }
-
-wasp::platform::registration __kvm__reg__ __register_platform = {
-    .name = "KVM",
-    .flags = PLATFORM_LINUX,
-    .allocate = kvm_allocate,
-};

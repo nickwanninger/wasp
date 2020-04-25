@@ -43,50 +43,6 @@ function(wasp_target_set_lang_standard TARGET_NAME)
 
 endfunction()
 
-function(wasp_target_link_backend_library TARGET_NAME)
-    # see also
-    # > https://stackoverflow.com/a/42083877/809572
-    # > https://cmake.org/cmake/help/latest/manual/cmake-generator-expressions.7.html
-    # > https://cmake.org/cmake/help/latest/command/target_link_libraries.html#id2 (under "a link flag")
-    #
-
-    if (CMAKE_CXX_COMPILER_MSVC)
-        set(WASP_BACKEND_TARGET_NAME wasp_backend_windows)
-        target_link_libraries(${TARGET_NAME} PRIVATE -wholearchive:$<TARGET_LINKER_FILE:wasp_backend_windows>)
-
-    elseif(LINUX)
-        set(WASP_BACKEND_TARGET_NAME wasp_backend_linux)
-
-        if (CMAKE_CXX_COMPILER_GCC)
-            # see also https://stackoverflow.com/a/50281571/809572
-            target_link_libraries(${TARGET_NAME} PRIVATE "-Wl,--whole-archive $<TARGET_LINKER_FILE:wasp_backend_linux> -Wl,--no-whole-archive")
-
-        elseif (CMAKE_CXX_COMPILER_CLANG)
-            target_link_libraries(${TARGET_NAME} PRIVATE "-Wl,-force_load $<TARGET_LINKER_FILE:wasp_backend_linux>")
-
-        else()
-            message(FATAL_ERROR "Unsupported Linux compiler '${CMAKE_CXX_COMPILER_ID}' while attempting to add WASP backend to ${TARGET_NAME}.")
-        endif()
-
-    else()
-        message(FATAL_ERROR "Unsupported platform and/or compiler while attempting to add WASP backend to ${TARGET_NAME}.")
-    endif()
-
-    add_dependencies(${TARGET_NAME} ${WASP_BACKEND_TARGET_NAME})
-    get_target_property(WASP_BACKEND_INTERFACE_LIBRARIES ${WASP_BACKEND_TARGET_NAME} INTERFACE_LINK_LIBRARIES)
-    target_link_libraries(${TARGET_NAME} PRIVATE ${WASP_BACKEND_INTERFACE_LIBRARIES})
-
-endfunction()
-
-function(wasp_target_link_libraries TARGET_NAME)
-    target_link_libraries(${TARGET_NAME} PRIVATE wasp)
-    get_property(PROJECT_LANGUAGES GLOBAL PROPERTY ENABLED_LANGUAGES)
-    if ("C" IN_LIST PROJECT_LANGUAGES)
-			# target_link_libraries(${TARGET_NAME} PRIVATE wasp_c)
-    endif()
-
-    wasp_target_link_backend_library(${TARGET_NAME})
-endfunction()
 
 macro(wasp_get_dirname NAME)
     # see also https://stackoverflow.com/a/12345018/809572
@@ -96,7 +52,4 @@ endmacro()
 
 ###
 
-add_subdirectory(core)
-# add_subdirectory(core_wrapper)
-add_subdirectory(platform)
-add_subdirectory(demos)
+add_subdirectory(wasp)

@@ -10,7 +10,7 @@ wasp::machine::~machine(void) = default;
 
 machine::unique_ptr machine::create(size_t memsize)
 {
-  machine::unique_ptr v = platform::create(PLATFORM_ANY);
+  machine::unique_ptr v = platform::create();
   if (v == nullptr) { return v; }
   v->allocate_ram(memsize);
   v->reset();
