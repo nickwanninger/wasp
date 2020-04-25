@@ -7,4 +7,4 @@ wasp_target_configure_demo(${PROJECT_NAME})
 target_sources(${PROJECT_NAME}
         PRIVATE
         main.cpp
-        workload.cpp)
+)

@@ -17,7 +17,8 @@ typedef wasp_loader_t *(*wasp_loader_create_fn_t)(const char *path);
 wasp_loader_t *wasp_elf_loader_create(const char *path);
 wasp_loader_t *wasp_flatbin_loader_create(const char *path);
 
-//
+// just load some binary code from ram
+void wasp_inject_code(wasp_machine_t *vmc, void *code, u64 size, u64 entry);
 
 #ifdef __cplusplus
 }; // extern "C"

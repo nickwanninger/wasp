@@ -847,3 +847,21 @@ extern "C" {
 extern "C" {
     pub fn wasp_flatbin_loader_create(path: *const ::std::os::raw::c_char) -> *mut wasp_loader_t;
 }
+extern "C" {
+    pub fn wasp_inject_code(
+        vmc: *mut wasp_machine_t,
+        code: *mut ::std::os::raw::c_void,
+        size: u64,
+        entry: u64,
+    );
+}
+extern "C" {
+    pub fn wasp_foo(
+        callback: ::std::option::Option<
+            unsafe extern "C" fn(
+                arg1: *mut ::std::os::raw::c_void,
+                arg2: *mut ::std::os::raw::c_void,
+            ) -> ::std::os::raw::c_int,
+        >,
+    ) -> ::std::os::raw::c_int;
+}

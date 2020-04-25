@@ -43,5 +43,19 @@ wasp_loader_t *wasp_flatbin_loader_create(const char *path) {
   return details::create_loader<wasp::loader::flatbin_loader>(path);
 }
 
+void wasp_inject_code(wasp_machine_t *vmc, void *code, u64 size, u64 entry) {
+	auto &vm = vmc->container->get();
+	// I hope theres enough ram
+	void *addr = vm.gpa2hpa(entry);
+	memcpy(addr, code, size);
+
+	wasp::regs_t r = {};
+  vm.cpu(0).read_regs_into(r);
+  r.rip = entry;
+  r.rsp = entry;
+  r.rbp = entry;
+  vm.cpu(0).write_regs(r);
+}
+
 
 } // extern "C"
