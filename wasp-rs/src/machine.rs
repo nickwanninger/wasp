@@ -112,7 +112,7 @@ impl<'a> HyperCall<'a> {
             return None;
         }
 
-        let slice = unsafe {  std::slice::from_raw_parts(self.ram.offset(off as isize), len as usize) };
+        let slice = unsafe { std::slice::from_raw_parts(self.ram.offset(off as isize), len as usize) };
         Some(slice.to_vec())
     }
 
