@@ -5,7 +5,7 @@
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 
-use std::sync::{Mutex, Arc};
+use std::sync::{Mutex};
 use std::collections::{VecDeque};
 
 pub enum ExitType {
@@ -48,7 +48,7 @@ impl<'a> Machine<'a> {
     }
 
     // run the VM with a certain workload
-    pub fn run(&mut self, f: impl for<'b> Fn(&mut HyperCall) -> ExitType)
+    pub fn run(&mut self, f: impl for<'b> FnMut(&mut HyperCall) -> ExitType)
     {
         if !self.clean {
             self.reset();
@@ -57,6 +57,7 @@ impl<'a> Machine<'a> {
         let mut ctx = WorkloadContext {
             cb: Box::new(f)
         };
+
         let mut workload = wasp_workload_t {
             ctx: &mut ctx as *mut _ as *mut std::os::raw::c_void,
             init: Some(workload_init),
@@ -96,12 +97,10 @@ pub struct HyperCall<'a> {
 
 impl<'a> HyperCall<'a> {
 
-
     fn read_byte(&self, off: isize) -> u8 {
         if off >= self.ramsize as isize {
             return 0u8;
         }
-
         unsafe {*self.ram.offset(off)}
     }
 
@@ -136,7 +135,7 @@ impl<'a> HyperCall<'a> {
 
 // unsafe implementations for the workload callbacks
 struct WorkloadContext<'b> {
-    pub cb: Box<dyn Fn(&mut HyperCall) -> ExitType + 'b>
+    pub cb: Box<dyn FnMut(&mut HyperCall) -> ExitType + 'b>
 }
 
 
@@ -158,7 +157,7 @@ unsafe extern "C" fn workload_hcall(
         ramsize: ramsize as usize
     };
 
-    let ctx = &*((*workload).ctx as *mut WorkloadContext);
+    let ctx = &mut *((*workload).ctx as *mut WorkloadContext);
 
     match (ctx.cb)(&mut hcall) {
         ExitType::Okay => 0,
@@ -181,7 +180,7 @@ pub struct MachinePool<'a, T> {
     avail: Mutex<VecDeque<Machine<'a>>>,
     ramsize: usize,
     code: &'a [u8],
-    cb: Arc<dyn Fn(&mut HyperCall, T) -> ExitType + 'static>
+    cb: Box<dyn FnMut(&mut HyperCall, T) -> ExitType + 'static>
 }
 
 
@@ -189,13 +188,13 @@ impl<'a, T: Copy> MachinePool<'a, T> {
     pub fn new(
         ramsize: usize,
         code: &'a [u8],
-        f: impl Fn(&mut HyperCall, T) -> ExitType + 'static,
+        f: impl FnMut(&mut HyperCall, T) -> ExitType + 'static,
     ) -> Self {
         MachinePool {
             avail: Mutex::new(VecDeque::new()),
             ramsize,
             code,
-            cb: Arc::new(f)
+            cb: Box::new(f)
         }
     }
 
@@ -208,7 +207,6 @@ impl<'a, T: Copy> MachinePool<'a, T> {
             a.pop_front().expect("hey, std::sync::Mutex lied to us. Not cool!")
         }
     }
-
 
     /// run a vm with an "argument value" `val`
     pub fn fire(&mut self, val: T) {

@@ -855,13 +855,3 @@ extern "C" {
         entry: u64,
     );
 }
-extern "C" {
-    pub fn wasp_foo(
-        callback: ::std::option::Option<
-            unsafe extern "C" fn(
-                arg1: *mut ::std::os::raw::c_void,
-                arg2: *mut ::std::os::raw::c_void,
-            ) -> ::std::os::raw::c_int,
-        >,
-    ) -> ::std::os::raw::c_int;
-}

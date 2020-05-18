@@ -16,6 +16,7 @@ proc-macro-hack = "0.5"
 capstone = "0.7.0"
 workerpool = "1.2.0"
 pretty-hex = "0.1.1"
+tokio = { version = "0.2.21", features = ["rt-threaded", "macros", "sync"] }
 
 [build-dependencies]
 bindgen = "0.53.2"
