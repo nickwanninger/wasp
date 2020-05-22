@@ -311,7 +311,7 @@ hyperv_machine::allocate_guest_phys_memory(
       MEM_RESERVE | MEM_COMMIT,
       PAGE_EXECUTE_READWRITE);
 
-  fprintf(stderr, "allocate_virtual_memory -> %p\n", host_virtual_addr);
+//  fprintf(stderr, "allocate_virtual_memory -> %p\n", host_virtual_addr);
   if (host_virtual_addr == nullptr) {
     PANIC("failed to allocated virtual memory of size %lld bytes", size);
   }
@@ -495,6 +495,7 @@ static machine::unique_ptr hyperv_allocate() {
 
 __register_platform(__hyperv__reg__)
 wasp::platform::registration __hyperv__reg__ = {
+    .magic = WASP_REGISTRATION_MAGIC,
     .name = "Microsoft Hyper-V",
     .flags = PLATFORM_WINDOWS,
     .allocate = hyperv_allocate,

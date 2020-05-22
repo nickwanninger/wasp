@@ -13,7 +13,7 @@ elf_loader::elf_loader(std::string path) {
 }
 
 bool elf_loader::inject(wasp::machine &vm) {
-  fprintf(stderr, "%s\n", __FUNCTION__);
+//  fprintf(stderr, "%s\n", __FUNCTION__);
   auto entry = reader.get_entry();
   vm.set_entry(entry);
 
@@ -29,7 +29,7 @@ bool elf_loader::inject(wasp::machine &vm) {
 
     if (type == SHT_PROGBITS) {
       if (size == 0) {
-        fprintf(stderr, "%s: skip '%s' (0x%llx) size 0x%llx\n", __FUNCTION__, name.data(), gpa, size);
+//        fprintf(stderr, "%s: skip '%s' (0x%llx) size 0x%llx\n", __FUNCTION__, name.data(), gpa, size);
         continue;
       }
 
@@ -40,10 +40,10 @@ bool elf_loader::inject(wasp::machine &vm) {
       const char *data = psec->get_data();
       auto dst = (char *)vm.gpa2hpa(gpa);
       memcpy(dst, data, size);
-      fprintf(stderr, "%s: map  '%s' (0x%llx) size 0x%llx\n", __FUNCTION__, name.data(), gpa, size);
+//      fprintf(stderr, "%s: map  '%s' (0x%llx) size 0x%llx\n", __FUNCTION__, name.data(), gpa, size);
     }
     else {
-      fprintf(stderr, "%s: skip '%s' (0x%llx) size 0x%llx\n", __FUNCTION__, name.data(), gpa, size);
+//      fprintf(stderr, "%s: skip '%s' (0x%llx) size 0x%llx\n", __FUNCTION__, name.data(), gpa, size);
       continue;
     }
   }

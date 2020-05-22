@@ -7,13 +7,13 @@ double_workload::~double_workload() = default;
 int double_workload::handle_hcall(wasp::regs_t &regs, size_t ramsize,
                                   void *ram) {
   if (regs.rax == 0) {
-//      printf("%s: rax = 0\n", __FUNCTION__);
+      printf("%s: rax = 0\n", __FUNCTION__);
     regs.rbx = val;
     return WORKLOAD_RES_OKAY;
   }
 
   if (regs.rax == 1) {
-//      printf("%s: rax = 1\n", __FUNCTION__);
+      printf("%s: rax = 1\n", __FUNCTION__);
     if (regs.rbx != val * 2) {
       throw std::runtime_error("double test failed\n");
     }

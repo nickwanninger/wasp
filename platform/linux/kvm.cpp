@@ -585,6 +585,7 @@ static machine::unique_ptr kvm_allocate(void) {
 }
 
 wasp::platform::registration __kvm__reg__ __register_platform = {
+    .magic = WASP_REGISTRATION_MAGIC,
     .name = "KVM",
     .flags = PLATFORM_LINUX,
     .allocate = kvm_allocate,

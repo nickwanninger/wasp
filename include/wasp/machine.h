@@ -81,7 +81,11 @@ namespace platform {
 
 machine::unique_ptr create(int platform);
 
+#define WASP_REGISTRATION_MAGIC_LEN (4)
+#define WASP_REGISTRATION_MAGIC { 'W', 'A', 'S', 'P' }
+
 struct registration {
+  const char magic[WASP_REGISTRATION_MAGIC_LEN];
   const char *name;
   uint32_t flags;
   machine::unique_ptr (*allocate)(void);
@@ -99,13 +103,16 @@ struct registration {
 // for additional explination
 
 /*
- * Declare `vm_platforms` section for MSVC linker.
+ * Declare `vm_plat` section for MSVC linker.
  * We need to declare the start and end using `$a` and `$z` which will be merged
  * into the one section itself before the dollar sign.
+ *
+ * IMPORTANT: Keep in mind the section name limit is max 8 characters
+ * https://stackoverflow.com/a/14783759/809572
  */
-#pragma section("vm_platforms$a", read)
-#pragma section("vm_platforms$u", read)
-#pragma section("vm_platforms$z", read)
+#pragma section("vm_plat$a", read)
+#pragma section("vm_plat$u", read)
+#pragma section("vm_plat$z", read)
 
 /*
  * Force the linker to include the definition
@@ -119,7 +126,7 @@ struct registration {
 
 #define __register_platform(NAME) \
    FORCE_EXPORT(NAME) extern "C" \
-   __declspec(allocate("vm_platforms$u")) \
+   __declspec(allocate("vm_plat$u")) \
    IGNORE_UNUSED __declspec(align(sizeof(void *)))
 
 #else
