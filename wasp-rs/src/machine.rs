@@ -15,18 +15,23 @@ pub enum ExitType {
 pub struct Machine<'a> {
     // reference to the internal machine object.
     machine: *mut wasp_machine_t,
-    // ramsize: u64,
+    ramsize: u64,
     code: &'a [u8],
     clean: bool,
 }
 
 impl<'a> Machine<'a> {
+
+    pub fn machine(&self) -> &wasp_machine_t {
+        return unsafe {&*self.machine};
+    }
+
     pub fn new(ramsize: u64, code: &'a [u8]) -> Self {
         let machine = unsafe { wasp_machine_create(ramsize) };
 
         let mut m = Machine {
             machine: machine,
-            // ramsize: ramsize,
+            ramsize: ramsize,
             code: code,
             clean: true,
         };
@@ -81,7 +86,7 @@ impl<'a> Drop for Machine<'a> {
     fn drop(&mut self) {
         // free the machine with the FFI
         unsafe {
-            wasp_machine_free(self.machine);
+            wasp_machine_free(self.machine, self.ramsize);
         };
     }
 }

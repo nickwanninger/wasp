@@ -819,7 +819,7 @@ extern "C" {
     pub fn wasp_machine_create(memsize: size_t) -> *mut wasp_machine_t;
 }
 extern "C" {
-    pub fn wasp_machine_free(self_: *mut wasp_machine_t);
+    pub fn wasp_machine_free(self_: *mut wasp_machine_t, memsize: size_t);
 }
 extern "C" {
     pub fn wasp_machine_run(self_: *mut wasp_machine_t, workload: *mut wasp_workload_t);
