@@ -1,0 +1,39 @@
+
+https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2-linux.html
+https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2-mac.html
+
+https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html#cli-quick-configuration
+$ aws configure
+
+https://docs.aws.amazon.com/IAM/latest/UserGuide/getting-started_create-admin-group.html
+
+
+rustup target add x86_64-unknown-linux-musl
+
+cargo build --release --target x86_64-unknown-linux-musl
+
+
+aws iam create-role --role-name wasp-lambda-execute --assume-role-policy-document file://aws-lambda-policy.json
+
+aws iam attach-role-policy --role-name wasp-lambda-execute --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaRole
+aws iam attach-role-policy --role-name wasp-lambda-execute --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+aws iam attach-role-policy --role-name wasp-lambda-execute --policy-arn arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
+
+
+rm lambda.zip \
+  && cp ./target/x86_64-unknown-linux-musl/release/fib_serverless ./bootstrap \
+  && zip lambda.zip bootstrap \
+  && rm bootstrap
+
+aws lambda create-function --function-name wasp-fib \
+  --handler wasp-fib-handler \
+  --zip-file fileb://./lambda.zip \
+  --runtime provided \
+  --role arn:aws:iam::225760913492:role/wasp-lambda-execute \
+  --environment Variables={RUST_BACKTRACE=1} \
+  --tracing-config Mode=Active
+ 
+ aws lambda update-function-code \
+    --function-name wasp-fib \
+    --zip-file fileb://lambda.zip
+ 
