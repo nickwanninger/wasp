@@ -1,8 +1,9 @@
 use serde::{Serialize, Deserialize};
 use crossbeam::channel;
-// use crossbeam::scope;
+use bincode;
 use core_affinity;
 use std::sync::{Arc, Mutex};
+
 
 
 type TaskID = i32;
@@ -11,20 +12,28 @@ type Recursor<T> = fn(T) -> Option<Vec<T>>;
 
 enum GraphCommand<T: Sync + Send> {
     // Evaluate the task with id TaskID with the state T and args Vec<T>
-    Evaluate(TaskID, T, Vec<T>, Evaluator<T>),
+    Evaluate(TaskID, TaskID /* feeds */, T, Vec<T>, Evaluator<T>),
+    Die,
 }
 
-enum GraphResponse<T: Sync + Send> {
-    // task with id TaskID evalutated to a final value of type T
-    Evaluated(TaskID, T)
-}
+
 
 pub struct Graph<T: Sync + Send> {
     tasks: Arc<Vec<Mutex<Node<T>>>>,
 }
 
 
-impl<T: 'static + Copy + Sync + Send> Graph<T> {
+impl<'de, T: 'static + Copy + Sync + Send + Serialize + Deserialize<'de>> Graph<T> {
+
+    pub fn oneshot(
+        initial_state: T,
+        recur: Recursor<T>,
+        eval: Evaluator<T>,
+        pool: &mut WorkPool
+    ) -> T {
+        let mut g = Graph::construct(initial_state, recur);
+        return g.evaluate(eval, pool);
+    }
 
     /// Construct a new graph with some initial state and functions to expand it
     pub fn construct(
@@ -34,7 +43,6 @@ impl<T: 'static + Copy + Sync + Send> Graph<T> {
         // construct the graph
         let mut g = Self { tasks: Arc::new(vec![]) };
         g.add_task(initial_state, -1, recur);
-
 
         return g;
     }
@@ -57,6 +65,7 @@ impl<T: 'static + Copy + Sync + Send> Graph<T> {
 
         if let Some(deps) = deps {
             node.waiting_on = deps.len() as i32;
+            node.values.reserve(deps.len());
             self.push_task(node);
             for st in deps {
                 self.add_task(st, id, recur);
@@ -67,38 +76,26 @@ impl<T: 'static + Copy + Sync + Send> Graph<T> {
     }
 
 
-    pub fn evaluate(&mut self, eval: Evaluator<T>, mut parallelism: usize) -> T {
-        if parallelism < 1 {
-            parallelism = 1;
-        }
+    pub fn evaluate(&mut self, eval: Evaluator<T>, pool: &mut WorkPool) -> T {
 
-        let cpus = num_cpus::get();
-
-        let (commands_send, commands_recv) = channel::unbounded();
         let (response_send, response_recv) = channel::unbounded();
-
+        let (commands_send, commands_recv) = channel::unbounded();
 
         // spawn all the threads to do work
-        let mut threads = Vec::with_capacity(parallelism);
-        for core_id in 0..parallelism {
+        for core_id in 0..pool.size() {
             let commands_recv = commands_recv.clone();
             let commands_send = commands_send.clone();
             let response_send = response_send.clone();
             let tasks = self.tasks.clone();
 
-            threads.push(std::thread::spawn(move || {
+            pool.exec(move || {
                 // set the core affinity of this thread
-                core_affinity::set_for_current(core_affinity::CoreId { id: (core_id % cpus) as usize });
+                core_affinity::set_for_current(core_affinity::CoreId { id: core_id as usize });
 
                 for cmd in commands_recv.into_iter() {
                     match cmd {
-                        GraphCommand::Evaluate(id, state, vals, eval) => {
+                        GraphCommand::Evaluate(_id, feeds, state, vals, eval) => {
                             let res = eval(state, vals);
-
-
-                            // Handle the fact that the task has been evaluated
-                            let feeds = tasks[id as usize].lock().unwrap().feeds;
-
 
                             if feeds == -1 {
                                 response_send.send(res).unwrap();
@@ -106,64 +103,68 @@ impl<T: 'static + Copy + Sync + Send> Graph<T> {
                             }
 
                             let mut dependant = tasks[feeds as usize].lock().unwrap();
-
                             dependant.values.push(res);
                             dependant.waiting_on -= 1;
                             if dependant.waiting_on == 0 {
-                                let cmd = GraphCommand::Evaluate(dependant.id, dependant.state, dependant.values.clone(), eval);
+                                let cmd = GraphCommand::Evaluate(dependant.id, dependant.feeds, dependant.state, dependant.values.clone(), eval);
                                 commands_send.send(cmd).unwrap();
                             }
                         },
+                        GraphCommand::Die => {
+                            break;
+                        }
                     }
                 }
-            }));
+            });
         }
 
         // push the initial state
         for t in self.tasks.iter() {
             let t = t.lock().unwrap();
             if t.waiting_on == 0 {
-                let cmd = GraphCommand::Evaluate(t.id, t.state, vec![], eval);
+                let cmd = GraphCommand::Evaluate(t.id, t.feeds, t.state, vec![], eval);
                 commands_send.send(cmd).unwrap();
             }
         }
 
+
         // and wait on the result from the threads :)
-        return response_recv.recv().unwrap();
+        let result = response_recv.recv().unwrap();
 
-
-        /*
-        */
-
-        /*
-        for event in response_recv {
-            match event {
-                GraphResponse::Evaluated(id, res) => {
-                    // Handle the fact that the task has been evaluated
-                    let feeds = self.tasks[id as usize].feeds;
-
-                    // Is this node the root node?
-                    if feeds == -1 {
-                        return Some(res);
-                    }
-
-                    let dependant = &mut self.tasks[feeds as usize];
-                    dependant.values.push(res);
-                    dependant.waiting_on -= 1;
-                    if dependant.waiting_on == 0 {
-                        let cmd = GraphCommand::Evaluate(dependant.id, dependant.state, dependant.values.clone(), eval);
-                        commands_send.send(cmd).unwrap();
-                    }
-                }
-            }
+        // kill all the threads and join them
+        for _core_id in 0..pool.size() {
+            commands_send.send(GraphCommand::Die).unwrap();
         }
-        */
+
+        return result;
+    }
 
 
+
+    pub fn load(data: &'de Vec<u8>) -> Self {
+        let mut g = Self { tasks: Arc::new(vec![]) };
+        let temp: Vec<Node<T>> = bincode::deserialize(&data).unwrap();
+
+        let mut v = vec![];
+        for t in temp {
+            v.push(Mutex::new(t));
+        }
+        g.tasks = Arc::new(v);
+        return g;
+    }
+
+
+    // serialize the graph
+    pub fn serialize(mut self) -> Vec<u8> {
+        let temp: Vec<Node<T>> = Arc::get_mut(&mut self.tasks).unwrap().into_iter().map(|v| {
+            v.get_mut().unwrap().clone()
+        }).collect();
+
+        bincode::serialize(&temp).unwrap()
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Node<T: Sync + Send> {
     pub id: TaskID,
     pub state: T,
@@ -172,8 +173,11 @@ pub struct Node<T: Sync + Send> {
     // feeds: Which task to notify of partial completion
     // If this value is -1 it feeds the "root's parent" which is the graph's mpsc
     pub feeds: TaskID,
+
     pub values: Vec<T>,
 }
+
+
 
 
 impl<T: Sync + Send> Node<T> {
@@ -187,5 +191,39 @@ impl<T: Sync + Send> Node<T> {
             waiting_on: 0, // waits on nothing. Graph::add_task sets this
             feeds, values: vec![],
         }
+    }
+}
+
+
+
+
+use threadpool;
+
+
+pub struct WorkPool {
+    size: usize,
+    pool: threadpool::ThreadPool
+}
+
+impl WorkPool {
+    pub fn new(nthreads: usize) -> Self {
+        Self {
+            size: nthreads,
+            pool: threadpool::ThreadPool::new(nthreads)
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
+
+    pub fn exec<F>(&self, job: F)
+        where F: FnOnce() + Send + 'static {
+        self.pool.execute(job);
+    }
+
+    pub fn join(&self) {
+        self.pool.join();
     }
 }

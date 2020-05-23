@@ -1,6 +1,9 @@
 extern crate crossbeam;
 extern crate core_affinity;
 extern crate num_cpus;
+extern crate threadpool;
+extern crate bincode;
+
 
 #[allow(unused_imports)]
 use proc_macro_hack;
@@ -25,58 +28,64 @@ fn fib_eval(n: i32, deps: Vec<i32>) -> i32 {
         return n;
     }
 
+
+    if false {
+        let code = cprog32!(r#"
+            extern long hcall(long number, unsigned long arg);
+
+            void main() {
+                // add them up
+                hcall(1, hcall(0, 0) + hcall(0, 1));
+            }
+        "#);
+
+        // allocate a vm with 4 pages of ram.
+        let mut m = machine::Machine::new(4096 * 4, code);
+        let mut res: i32 = 0;
+
+        m.run(|vm| {
+            match vm.regs.rax {
+                0 => {
+                    vm.regs.rax = deps[vm.regs.rbx as usize] as u64;
+                    return machine::ExitType::Okay;
+                }
+                1 => {
+                    res = vm.regs.rbx as i32;
+                    return machine::ExitType::Kill;
+                }
+                _ => {
+                    println!("unknown hypercall. Killing.");
+                    return machine::ExitType::Kill;
+                }
+            }
+        });
+        return res;
+    }
+
     return std::iter::Sum::sum(deps.into_iter());
-    /*
-    let code = cprog32!(r#"
-        extern long hcall(long number, unsigned long arg);
-
-        void main() {
-            // add them up
-            hcall(1, hcall(0, 0) + hcall(0, 1));
-        }
-    "#);
-
-    let mut m = machine::Machine::new(4096 * 4, code);
-    let mut res: i32 = 0;
-
-    m.run(|vm| {
-        match vm.regs.rax {
-            0 => {
-                vm.regs.rax = deps[vm.regs.rbx as usize] as u64;
-                return machine::ExitType::Okay;
-            }
-            1 => {
-                res = vm.regs.rbx as i32;
-                return machine::ExitType::Kill;
-            }
-            _ => {
-                println!("unknown hypercall. Killing.");
-                return machine::ExitType::Kill;
-            }
-        }
-    });
-    return res;
-    */
 }
 
 
 fn main() {
+    let mut pool = dataflow::WorkPool::new(32);
 
-    let cores = 7;
+    let n = 20;
+    let graph = dataflow::Graph::construct(n, fib_recurse).serialize();
 
+    println!("{} bytes of serialization", graph.len());
 
-    for cores in 0..num_cpus::get() {
-        let n = 20;
-        let mut g = dataflow::Graph::construct(n, fib_recurse);
+    for i in 0.. {
+
+        let mut g = dataflow::Graph::load(&graph);
 
         let start = Instant::now();
-        let result = g.evaluate(fib_eval, cores);
+        let result = g.evaluate(fib_eval, &mut pool);
         let test_time = start.elapsed().as_secs_f64();
 
-        println!("fib({}) = {} on {} cores, {:.3}s", n, result, cores, test_time);
+        println!("{:4}  fib({}) = {} in {:.6}s", i, n, result, test_time);
+        pool.join();
     }
 }
-
 
 
 
