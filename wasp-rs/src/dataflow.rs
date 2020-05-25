@@ -162,6 +162,11 @@ impl<'de, T: 'static + Copy + Sync + Send + Serialize + Deserialize<'de>> Graph<
 
         bincode::serialize(&temp).unwrap()
     }
+
+
+    pub fn task_count(&self) -> usize {
+        self.tasks.len()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

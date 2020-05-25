@@ -1,6 +1,4 @@
 
-#![feature(proc_macro_hygiene, decl_macro)]
-
 extern crate crossbeam;
 extern crate core_affinity;
 extern crate num_cpus;
@@ -13,8 +11,6 @@ use proc_macro_hack;
 #[proc_macro_hack::proc_macro_hack]
 #[allow(unused_imports)]
 use wasp_proc_macros::cprog32;
-
-#[macro_use] extern crate rocket;
 
 pub mod machine;
 pub mod dataflow;
@@ -35,7 +31,7 @@ fn fib(n: i32) -> i32 {
 
 
 fn fib_vm(n: i32) -> i32 {
-     let code = cprog32!(r#"
+    let code = cprog32!(r#"
         extern long hcall(long number, unsigned long arg);
 
 
@@ -69,7 +65,7 @@ fn fib_vm(n: i32) -> i32 {
                 println!("unknown hypercall. Killing.");
                 return machine::ExitType::Kill;
             }
-        }
+            }
     });
     return res;
 }
@@ -87,14 +83,14 @@ fn fib_recurse(n: i32) -> Option<Vec<i32>> {
     Some(vec![n - 1, n - 2])
 }
 
-fn fib_eval(n: i32, deps: Vec<i32>) -> i32 {
+
+fn fib_eval_vm(n: i32, deps: Vec<i32>) -> i32 {
     if n < 2 {
         return n;
     }
 
 
-    if true {
-        let code = cprog32!(r#"
+    let code = cprog32!(r#"
             extern long hcall(long number, unsigned long arg);
 
             void main() {
@@ -124,40 +120,23 @@ fn fib_eval(n: i32, deps: Vec<i32>) -> i32 {
             }
         });
         return res;
-    }
 
+}
+
+fn fib_eval_native(n: i32, deps: Vec<i32>) -> i32 {
+    if n < 2 {
+        return n;
+    }
     return std::iter::Sum::sum(deps.into_iter());
 }
-
-
-#[get("/fib/<n>")]
-fn get_fib(n: i32) -> String {
-    let mut pool = dataflow::WorkPool::new(15);
-
-    // let mut g = dataflow::Graph::load(&graph);
-    let mut g = dataflow::Graph::construct(n, fib_recurse);
-
-
-    // let start = Instant::now();
-    let result = g.evaluate(fib_eval, &mut pool);
-    // let test_time = start.elapsed().as_secs_f64();
-
-    // println!("|{:5}|  fib({}) = {} in {:.6}s", i, n, result, test_time);
-    // println!("{},{:.6}", i, test_time);
-    pool.join();
-    serde_json::to_string(&result).unwrap()
-}
-
 
 use std::fs::File;
 use std::io::prelude::*;
 
-fn main() {
 
-    let n = 20;
 
+fn measure_fib() {
     for n in 0..=(30/5) {
-    // for n in 0..3 {
         let n = n * 5;
 
         let mut file = File::create(format!("data/fib/fib_vm_{}.csv", n)).unwrap();
@@ -181,15 +160,71 @@ fn main() {
         }
         println!("{} done", n);
     }
+}
+
+
+
+fn measure_fib_dataflow() {
+
+    // one threadpool for the whole thing
+    let mut pool = dataflow::WorkPool::new(15);
+
+    for n in 0..=(15/5) {
+
+        let n = n * 5;
+
+
+        println!("working on fib({})...", n);
+
+        let mut native_file = File::create(format!("data/df/nested_native_{}.csv", n)).unwrap();
+        let mut vm_file = File::create(format!("data/df/nested_vm_{}.csv", n)).unwrap();
+
+        native_file.write(format!("n,latency,throughput,is_vm\n").as_bytes());
+        vm_file.write(format!("n,latency,throughput,is_vm\n").as_bytes());
+
+
+        for i in 0..100 {
+        println!("working on fib({})... {}", n, i);
+            let mut graph_vm = dataflow::Graph::construct(n, fib_recurse);
+            let mut graph_native = dataflow::Graph::construct(n, fib_recurse);
+
+            let ntasks = graph_vm.task_count() as f64;
+
+            let start = Instant::now();
+            graph_vm.evaluate(fib_eval_vm, &mut pool);
+            let vm_time = start.elapsed().as_secs_f64();
+
+
+            let start = Instant::now();
+            graph_native.evaluate(fib_eval_native, &mut pool);
+            let native_time = start.elapsed().as_secs_f64();
+
+
+            native_file.write(format!("{},{},{},{}\n", n, native_time, ntasks / native_time, false).as_bytes());
+            vm_file.write(format!("{},{},{},{}\n", n, vm_time, ntasks / native_time, true).as_bytes());
+
+            // native_file.write(format!("{},{:.8},{:.8},{:.8}\n", n, vm_time, rust_time, c_time).as_bytes());
+            // vm_file.write(format!("{},{:.8},{:.8},{:.8}\n", n, vm_time, rust_time, c_time).as_bytes());
+        }
+    }
+
+    pool.join();
+}
+
+fn main() {
+
+
+    // measure_fib();
+    measure_fib_dataflow();
 
 
     /*
 
-    rocket::ignite()
-        .mount("/", routes![
-            get_fib,
-        ]).launch();
-    */
+       rocket::ignite()
+       .mount("/", routes![
+       get_fib,
+       ]).launch();
+       */
 }
 
 
