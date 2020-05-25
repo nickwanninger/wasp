@@ -25,6 +25,9 @@ core_affinity = "0.5.10"
 threadpool = "1.8.1"
 bincode = "1.2.1"
 
+# test deps
+rocket = "0.4.4"
+
 [build-dependencies]
 bindgen = "0.53.2"
 cfg-if = "0.1"

@@ -80,4 +80,16 @@ void wasp_machine_reset(wasp_machine_t *self) {
   self->container->get().reset();
 }
 
+
+int wasp_fib(int n) {
+		if (n < 2) return n;
+		return wasp_fib(n-2) + wasp_fib(n-1);
+}
+
 }; // extern "C"
+
+
+
+
+
+
