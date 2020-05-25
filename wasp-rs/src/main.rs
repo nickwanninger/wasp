@@ -148,26 +148,40 @@ fn get_fib(n: i32) -> String {
     serde_json::to_string(&result).unwrap()
 }
 
+
+use std::fs::File;
+use std::io::prelude::*;
+
 fn main() {
 
     let n = 20;
 
-    for i in 0..1000 {
-        let start = Instant::now();
-        let result = fib_vm(n);
-        let vm_time = start.elapsed().as_secs_f64();
+    for n in 0..=(30/5) {
+    // for n in 0..3 {
+        let n = n * 5;
 
-        let start = Instant::now();
-        let result = fib(n);
-        let rust_time = start.elapsed().as_secs_f64();
+        let mut file = File::create(format!("data/fib/fib_vm_{}.csv", n)).unwrap();
+
+        for i in 0..1000 {
+            let start = Instant::now();
+            let result = fib_vm(n);
+            let vm_time = start.elapsed().as_secs_f64();
+
+            let start = Instant::now();
+            let result = fib(n);
+            let rust_time = start.elapsed().as_secs_f64();
 
 
-        let start = Instant::now();
-        let result = fib(n);
-        let c_time = start.elapsed().as_secs_f64();
+            let start = Instant::now();
+            let result = fib(n);
+            let c_time = start.elapsed().as_secs_f64();
 
-        println!("{},{:.8},{:.8},{:.8}", i, vm_time, rust_time, c_time);
+
+            file.write(format!("{},{:.8},{:.8},{:.8}\n", n, vm_time, rust_time, c_time).as_bytes());
+        }
+        println!("{} done", n);
     }
+
 
     /*
 
@@ -175,7 +189,6 @@ fn main() {
         .mount("/", routes![
             get_fib,
         ]).launch();
-
     */
 }
 

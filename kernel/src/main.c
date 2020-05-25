@@ -67,11 +67,6 @@ void kmain(void) {
 
   // AFTER RECV
   record_timestamp();
-  record_timestamp();
-  record_timestamp();
-  record_timestamp();
-  record_timestamp();
-  record_timestamp();
 
 
   send_data(recv_buf, nrecv);
