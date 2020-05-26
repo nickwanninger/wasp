@@ -22,8 +22,10 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     set(CMAKE_CXX_COMPILER_MSVC true)
 endif()
 
-function(wasp_target_set_lang_standard TARGET_NAME)
+
+function(wasp_target_set_lang_flags TARGET_NAME)
     get_property(PROJECT_LANGUAGES GLOBAL PROPERTY ENABLED_LANGUAGES)
+
     if ("C" IN_LIST PROJECT_LANGUAGES)
         set_property(TARGET ${TARGET_NAME} PROPERTY C_STANDARD 11)
     endif()

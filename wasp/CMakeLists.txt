@@ -13,7 +13,13 @@ target_include_directories(${LIBRARY_NAME}
 target_link_libraries(${LIBRARY_NAME}
         PRIVATE Threads::Threads)
 
-#wasp_target_set_lang_standard(${LIBRARY_NAME})
+wasp_target_set_lang_flags(${LIBRARY_NAME})
+
+if (CMAKE_CXX_COMPILER_CLANG OR CMAKE_CXX_COMPILER_GCC)
+# Enable Position-Independent-Code when building static libraries for Rust
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
+endif()
 
 target_sources(${LIBRARY_NAME}
         PRIVATE
