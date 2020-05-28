@@ -17,6 +17,7 @@ function(wasp_target_configure_demo PROJECT_NAME)
 endfunction()
 
 add_subdirectory(boottime)
+add_subdirectory(freshtime)
 add_subdirectory(double)
 add_subdirectory(double_c)
 add_subdirectory(fib)

@@ -50,7 +50,7 @@ hyperv_machine::hyperv_machine(uint32_t num_cpus)
 {
   ++instance_count;
   TIMEIT_MARK(g_main, __FUNCTION__);
-  ensure_capability_or_throw();
+//  ensure_capability_or_throw();
 
   WHV_PARTITION_HANDLE handle = create_partition();
   handle_ = handle;
@@ -162,8 +162,8 @@ void hyperv_machine::run(workload &work) {
   TIMEIT_FN(g_main);
 
   while (true) {
-    wasp::regs_t snapshot_regs_pre = {};
-    cpu_[0].read_regs_into(snapshot_regs_pre);
+//    wasp::regs_t snapshot_regs_pre = {};
+//    cpu_[0].read_regs_into(snapshot_regs_pre);
 
 //    printf("================= (1) PRE-EXECUTE =================== \n");
 //    cpu_[0].dump_state(stdout);
@@ -171,6 +171,7 @@ void hyperv_machine::run(workload &work) {
 
     TIMEIT_BEGIN(g_main, vcpu, "vcpu run");
     WHV_RUN_VP_EXIT_CONTEXT run = cpu_[0].run();
+    return; // HACK: FOR TESTING PURPOSES
     TIMEIT_END(g_main, vcpu);
 
 //    printf("================= (2) POST-EXECUTE =================== \n");
@@ -353,7 +354,7 @@ hyperv_machine::allocate_virtual_memory(
     PANIC("failed to allocate virtual memory of size %lld bytes", size);
   }
 
-  virtual_allocs_.emplace_back(addr, size);
+//  virtual_allocs_.emplace_back(addr, size);
   return addr;
 }
 
