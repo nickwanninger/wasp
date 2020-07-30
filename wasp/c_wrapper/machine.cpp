@@ -1,6 +1,7 @@
 #include <wasp/compiler_defs.h>
 #include <wasp/machine.h>
 #include <wasp/workload.h>
+#include <wasp_c/loader.h>
 
 #include <wasp_c/machine.h>
 #include "opaque_types.h"
@@ -92,4 +93,40 @@ int wasp_fib(int n) {
 
 
 
+class null_workload : public wasp::workload {
+public:
+  null_workload() = default;
+  ~null_workload() override = default;
+  int handle_hcall(wasp::regs_t &regs, size_t ramsize, void *ram) override {
+		printf("rax=%016llx\n", regs.rax);
+		return WORKLOAD_RES_OKAY;
+	}
+};
 
+
+
+/**
+ * arg is loaded into 0x0000 and is read back out when running is done
+ */
+extern "C" void wasp_run_virtine(const char *code, size_t codesz, size_t memsz, void *arg, size_t argsz) {
+	auto vm = wasp_machine_create(memsz);
+	wasp_inject_code(vm, (void*)code, codesz, 0x1000);
+
+  // wasp::wrapper::details::workload_wrapper wrapper(workload);
+	auto &machine = vm->container->get();
+
+	auto *arg_pos = (void*)machine.gpa2hpa(0);
+
+	// copy the argument into the machine's ram
+	memcpy(arg_pos, arg, argsz);
+
+	// for (int i = 0; i < 32; i++) printf("%02x ", ((unsigned char *)arg_pos)[i]); printf("\n");
+
+	null_workload wl;
+	machine.run(wl);
+
+	// for (int i = 0; i < 32; i++) printf("%02x ", ((unsigned char *)arg_pos)[i]); printf("\n");
+
+	// copy the argument out of the machine's ram
+	memcpy(arg, arg_pos, argsz);
+}

@@ -24,6 +24,14 @@ build/%.cpp.o: %.cpp
 $(FINAL_BIN):
 	mkdir -p build; cd build; cmake ..; make -w -j
 
+
+
+install: $(FINAL_BIN)
+	cd build; make install
+
+do:
+	mkdir -p build; cd build; cmake ..; make -w -j
+
 build:
 	mkdir -p build
 

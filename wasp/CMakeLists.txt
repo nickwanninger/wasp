@@ -5,7 +5,9 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 set(LIBRARY_NAME ${PROJECT_NAME})
-add_library(${LIBRARY_NAME} STATIC "")
+add_library(${LIBRARY_NAME} SHARED "")
+
+install(TARGETS ${LIBRARY_NAME})
 
 target_include_directories(${LIBRARY_NAME}
         PUBLIC ../include)
