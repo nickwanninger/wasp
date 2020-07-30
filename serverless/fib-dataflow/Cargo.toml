@@ -1,0 +1,32 @@
+[package]
+name = "fib_dataflow_serverless"
+version = "0.1.0"
+authors = ["Josh Bowden <josbow@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "0.2.21", features = ["full"] }
+futures = "0.3.5"
+
+lambda_http = "0.1.1"
+lambda = { version = "0.1.0", git = "https://github.com/awslabs/aws-lambda-rust-runtime", rev = "91d2a60d4a0d040332521576f9ac349add3db128" }
+
+serde = { version = "1.0.110", features = ["derive"] }
+serde_json = "1.0.53"
+
+simple_logger = "1.6.0"
+
+rusoto_core = "0.43.0"
+rusoto_lambda = "0.43.0"
+
+# dataflow engine deps
+crossbeam = "0.7.3"
+bincode = "1.2.1"
+num_cpus = "1.13.0"
+core_affinity = "0.5.10"
+threadpool = "1.8.1"
+
+# reporting
+chrono = "0.4.11"
